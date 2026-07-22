@@ -49,7 +49,7 @@ data class AssetResponseDto(
     val fileModifiedAt: String, // DateTime
     val hasMetadata: Boolean,
     val height: Int? = null,
-    val id: String,
+    val id: UUID,
     val isArchived: Boolean,
     val isEdited: Boolean,
     val isFavorite: Boolean,

@@ -1,18 +1,15 @@
 package services
 
-import integration.immich.AssetMultipartUpload
+import integration.immich.AssetMediaResponseDto
 import integration.immich.AssetResponseDto
 import integration.immich.ImmichClient
-import integration.immich.ImmichLoggingFilter
 import integration.immich.SearchAssetsRequest
 import integration.immich.SearchAssetsResponse
-import io.vertx.core.buffer.Buffer
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.MediaType
 import org.eclipse.microprofile.rest.client.RestClientBuilder
 import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
 import java.io.File
-import java.io.FileInputStream
 import java.io.InputStream
 import java.net.URI
 import java.nio.file.Files
@@ -79,46 +76,17 @@ class ImmichService {
             .let { MediaType.valueOf(it) to getSuffixFromMimeType(it) }
     }
 
-    /* fun uploadLocalFile(
-        apiKey: String,
-        assetResponse: AssetResponseDto,
-        fileToUpload: File,
-    ): String {
-        // Prepare the multi-part data payload container object
-        val uploadForm = AssetMultipartUpload().apply {
-            this.assetData = FileInputStream(fileToUpload)
-
-            // TODO: what to put here ?
-            this.deviceId = "quarkus-backend"
-            // Immich identifies unique items based on deviceAssetId matching names + stamps
-            this.deviceAssetId = "${fileToUpload.name}-${assetResponse.fileCreatedAt}"
-
-            this.fileCreatedAt = assetResponse.fileCreatedAt
-            this.fileModifiedAt = assetResponse.fileModifiedAt
-        }
-
-        return uploadForm.assetData.use {
-            client.uploadAsset(apiKey, uploadForm)
-        }
-    } */
-
     fun uploadLocalFile(
         apiKey: String,
         assetResponse: AssetResponseDto,
         fileToUpload: File,
         mediaType: MediaType,
-    ): String {
-        // Programmatically build the unified modern multipart form
-        val form = ClientMultipartForm.create()
-            .binaryFileUpload("assetData", fileToUpload.name, fileToUpload.absolutePath, mediaType.toString())
-            .attribute("deviceId", "quarkus-blocking-backend", "")
-            .attribute("deviceAssetId", "${fileToUpload.name}-${assetResponse.fileCreatedAt}", "")
-            .attribute("fileCreatedAt", assetResponse.fileCreatedAt, "")
-            .attribute("fileModifiedAt", assetResponse.fileModifiedAt, "")
-
-        // Fires a standard synchronous blocking call
-        return client.uploadAsset(apiKey, form)
-    }
+    ): AssetMediaResponseDto = client.uploadAsset(apiKey, ClientMultipartForm.create()
+        .binaryFileUpload("assetData", fileToUpload.name, fileToUpload.absolutePath, mediaType.toString())
+        .attribute("deviceId", "quarkus-blocking-backend", "")
+        .attribute("deviceAssetId", "${fileToUpload.name}-${assetResponse.fileCreatedAt}", "")
+        .attribute("fileCreatedAt", assetResponse.fileCreatedAt, "")
+        .attribute("fileModifiedAt", assetResponse.fileModifiedAt, ""))
 
     private fun getSuffixFromMimeType(contentType: String?): HandledContentType {
         if (contentType.isNullOrBlank()) return HandledContentType.UNKNOWN

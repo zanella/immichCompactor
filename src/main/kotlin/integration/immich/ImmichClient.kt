@@ -5,6 +5,7 @@ import jakarta.ws.rs.Consumes
 import jakarta.ws.rs.GET
 import jakarta.ws.rs.HeaderParam
 import jakarta.ws.rs.POST
+import jakarta.ws.rs.PUT
 import jakarta.ws.rs.Path
 import jakarta.ws.rs.PathParam
 import jakarta.ws.rs.Produces
@@ -59,9 +60,16 @@ interface ImmichClient {
     @Path("/assets")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     fun uploadAsset(
-        @HeaderParam("x-api-key") apiKey: String,
+        @HeaderParam(X_API_KEY) apiKey: String,
         multipartForm: ClientMultipartForm
-    ): String // Returns a JSON response string with the uploaded asset details
+    ): AssetMediaResponseDto
+
+    @PUT
+    @Path("/assets/copy")
+    fun copyAsset(
+        @HeaderParam(X_API_KEY) apiKey: String,
+        requestBody: CopyAssetRequest
+    )
 }
 
 ///////////////////////////////////////

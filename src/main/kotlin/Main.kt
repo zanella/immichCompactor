@@ -1,3 +1,5 @@
+import integration.immich.AssetMediaStatus
+import integration.immich.CopyAssetRequest
 import io.quarkus.runtime.QuarkusApplication
 import io.quarkus.runtime.annotations.QuarkusMain
 import jakarta.inject.Inject
@@ -9,6 +11,7 @@ import services.ImmichService
 import java.io.File
 import java.nio.file.Files
 import java.util.UUID
+import kotlin.Boolean
 import kotlin.system.exitProcess
 
 data class Config (
@@ -91,21 +94,40 @@ class Main : QuarkusApplication {
 
             val convertedFd = convertAsset(fileType, downloadFd, asset.originalFileName, tmpDir)
 
-            // TODO: downloadFd.delete()
+            // TODO: move to finally
+            downloadFd.delete()
 
-            // Upload
-            immichService.uploadLocalFile(
+            //
+            val uploadResponse = immichService.uploadLocalFile(
                 defaultUserInfo.apiKey,
                 asset,
                 convertedFd,
                 mediaType,
-            )
+            ).also {
+                require(it.status == AssetMediaStatus.created) {
+                    "Immich said ${convertedFd.name} is a duplicate"
+                }
+            }
 
             // TODO: save step to DB
 
-            // TODO: convertedFd.delete()
+            // TODO: move to finally
+            convertedFd.delete()
 
-            // TODO: transfer metadata -> https://api.immich.app/endpoints/assets/copyAsset
+            // Transfer metadata
+            immichService.client.copyAsset(defaultUserInfo.apiKey,
+                CopyAssetRequest(
+                    albums = true,
+                    favorite = true,
+                    sharedLinks = true,
+                    sidecar = true,
+                    sourceId = asset.id,
+                    stack = true,
+                    targetId = uploadResponse.id
+                )
+            )
+
+            // TODO: save step to DB
 
             // TODO: Delete original
 
