@@ -1,0 +1,5 @@
+quarkus:
+  datasource:
+    devservices:
+      enabled:
+        false
