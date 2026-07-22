@@ -3,3 +3,21 @@ quarkus:
     devservices:
       enabled:
         false
+  flyway:
+    migrate-at-start: true
+
+"%dev": # these configs are for local development (quarkusDev)
+  quarkus:
+    security:
+      auth:
+        enabled-in-dev-mode: false
+    datasource:
+      db-kind: postgresql
+      username: postgres
+      password: postgres
+      jdbc:
+        url: jdbc:postgresql://localhost:5435/immich_compactor
+    hibernate-orm:
+      schema-management:
+        strategy: validate
+#EOF

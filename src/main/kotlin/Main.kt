@@ -47,8 +47,11 @@ class Main : QuarkusApplication {
     private val defaultUserInfo =
         UserInfo(
             name = "dev_sandbox",
-            apiKey = "4kIF0A1ObDCEf5Znluug6nWXcsncXlPkk1jGH0nRF8",
+            apiKey = "H2LzDTSsaJrogKz1T7Z7pWyDQV8UbVUzC0A9JCi9A",
         )
+
+    private fun checkDb() {
+    }
 
     /**
      * TODO Gradle:
@@ -60,6 +63,9 @@ class Main : QuarkusApplication {
      *
      */
     override fun run(vararg args: String?): Int {
+        checkDb()
+        return 0
+
         val tmpDir =
             Files
                 .createTempDirectory("immich-upload-")
@@ -89,9 +95,7 @@ class Main : QuarkusApplication {
                     targetOutputFile = downloadFd,
                 )
 
-            // Pass through converter
-            // TODO: create a file without the random part
-
+            //
             val convertedFd = convertAsset(fileType, downloadFd, asset.originalFileName, tmpDir)
 
             // TODO: move to finally
