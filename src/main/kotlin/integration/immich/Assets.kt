@@ -14,8 +14,8 @@ data class AssetMediaResponseDto(
 )
 
 enum class AssetMediaStatus {
-    created,
-    duplicate,
+    CREATED,
+    DUPLICATE,
 }
 
 @Serializable

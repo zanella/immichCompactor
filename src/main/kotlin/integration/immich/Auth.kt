@@ -12,5 +12,6 @@ data class AuthStatusResponse(
 )
 
 @Serializable
-data class AuthValidateTokenResponse(val authStatus: Boolean)
-
+data class AuthValidateTokenResponse(
+    val authStatus: Boolean,
+)

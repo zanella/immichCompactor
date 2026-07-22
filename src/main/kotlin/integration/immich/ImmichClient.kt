@@ -1,6 +1,5 @@
 package integration.immich
 
-import jakarta.ws.rs.BeanParam
 import jakarta.ws.rs.Consumes
 import jakarta.ws.rs.GET
 import jakarta.ws.rs.HeaderParam
@@ -11,11 +10,11 @@ import jakarta.ws.rs.PathParam
 import jakarta.ws.rs.Produces
 import jakarta.ws.rs.client.ClientRequestContext
 import jakarta.ws.rs.client.ClientRequestFilter
-import org.jboss.logging.Logger
 import jakarta.ws.rs.client.ClientResponseContext
 import jakarta.ws.rs.client.ClientResponseFilter
 import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
+import org.jboss.logging.Logger
 import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
 import java.io.ByteArrayInputStream
 import java.io.IOException
@@ -24,29 +23,32 @@ import java.util.UUID
 
 @Path("/api")
 interface ImmichClient {
-
     @GET
     @Path("/auth/status")
-    fun authStatus(@HeaderParam(X_API_KEY) apiKey: String): AuthStatusResponse
+    fun authStatus(
+        @HeaderParam(X_API_KEY) apiKey: String,
+    ): AuthStatusResponse
 
     @POST
     @Path("/auth/validateToken")
-    fun authValidateToken(@HeaderParam(X_API_KEY) apiKey: String): AuthValidateTokenResponse
+    fun authValidateToken(
+        @HeaderParam(X_API_KEY) apiKey: String,
+    ): AuthValidateTokenResponse
 
-    ///////////////////////////////////////////////////////////////////////////
+    // /////////////////////////////////////////////////////////////////////////
 
     @POST
     @Path("/search/metadata")
     fun searchByMetadata(
         @HeaderParam(X_API_KEY) apiKey: String,
-        requestBody: SearchAssetsRequest
+        requestBody: SearchAssetsRequest,
     ): SearchAssetsResponse
 
     companion object {
         const val X_API_KEY = "x-api-key"
     }
 
-    ///////////////////////////////////////////////////////////////////////////
+    // /////////////////////////////////////////////////////////////////////////
 
     @GET
     @Path("/assets/{id}/original")
@@ -61,20 +63,22 @@ interface ImmichClient {
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     fun uploadAsset(
         @HeaderParam(X_API_KEY) apiKey: String,
-        multipartForm: ClientMultipartForm
+        multipartForm: ClientMultipartForm,
     ): AssetMediaResponseDto
 
     @PUT
     @Path("/assets/copy")
     fun copyAsset(
         @HeaderParam(X_API_KEY) apiKey: String,
-        requestBody: CopyAssetRequest
+        requestBody: CopyAssetRequest,
     )
 }
 
-///////////////////////////////////////
+// /////////////////////////////////////
 
-class ImmichLoggingFilter : ClientRequestFilter, ClientResponseFilter {
+class ImmichLoggingFilter :
+    ClientRequestFilter,
+    ClientResponseFilter {
     private val log = Logger.getLogger(ImmichLoggingFilter::class.java)
 
     @Throws(IOException::class)
@@ -95,7 +99,10 @@ class ImmichLoggingFilter : ClientRequestFilter, ClientResponseFilter {
     }
 
     @Throws(IOException::class)
-    override fun filter(requestContext: ClientRequestContext, responseContext: ClientResponseContext) {
+    override fun filter(
+        requestContext: ClientRequestContext,
+        responseContext: ClientResponseContext,
+    ) {
         val status = responseContext.status
         val statusInfo = responseContext.statusInfo
         log.info("<--- Received Response Status: $status $statusInfo")
@@ -129,8 +136,8 @@ class ImmichLoggingFilter : ClientRequestFilter, ClientResponseFilter {
         val type = mediaType.type.lowercase()
 
         return type == "text" ||
-                subtype == "json" ||
-                subtype.endsWith("+json") ||
-                subtype.endsWith("+xml")
+            subtype == "json" ||
+            subtype.endsWith("+json") ||
+            subtype.endsWith("+xml")
     }
 }

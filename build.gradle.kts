@@ -6,6 +6,7 @@ plugins {
 
     id("io.quarkus")
     id("com.google.osdetector") version "1.7.3"
+    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
 }
 
 group = "raf.zane"

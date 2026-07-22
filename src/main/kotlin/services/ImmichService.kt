@@ -20,30 +20,32 @@ import java.util.UUID
 
 @ApplicationScoped
 class ImmichService {
-
     val client: ImmichClient by lazy {
         val dynamicBaseUrl = "http://localhost:2283"
 
-        RestClientBuilder.newBuilder()
+        RestClientBuilder
+            .newBuilder()
             .baseUri(URI.create(dynamicBaseUrl))
             // 1. Enable built-in network logging scope
             .property("quarkus.rest-client.logging.scope", "request-response")
             // 2. Set max body log limits in characters
             .property("quarkus.rest-client.logging.body-limit", "50000")
-            //.register(ImmichLoggingFilter::class.java)
+            // .register(ImmichLoggingFilter::class.java)
             .build(ImmichClient::class.java)
     }
 
     fun findRecentAssets(apiKey: String): SearchAssetsResponse {
-
         // Generate an ISO 8601 timestamp string for exactly 30 days ago
-        val thirtyDaysAgoIsoString = Instant.now()
-            .minus(30, ChronoUnit.DAYS)
-            .toString()
+        val thirtyDaysAgoIsoString =
+            Instant
+                .now()
+                .minus(30, ChronoUnit.DAYS)
+                .toString()
 
-        val searchCriteria = SearchAssetsRequest(
-            createdAfter = thirtyDaysAgoIsoString,
-        )
+        val searchCriteria =
+            SearchAssetsRequest(
+                createdAfter = thirtyDaysAgoIsoString,
+            )
 
         return client.searchByMetadata(apiKey, searchCriteria)
     }
@@ -51,7 +53,7 @@ class ImmichService {
     fun downloadAssetToDisk(
         apiKey: String,
         assetId: UUID,
-        targetOutputFile: File
+        targetOutputFile: File,
     ): Pair<MediaType, HandledContentType> {
         // 1. Fire the request and obtain the network socket reference
         val response = client.assetDownloadOriginal(apiKey, assetId)
@@ -62,8 +64,9 @@ class ImmichService {
         }
 
         // 3. Extract the binary input stream safely
-        val stream = response.entity as? InputStream
-            ?: throw IllegalStateException("Response body does not contain an stream entity")
+        val stream =
+            response.entity as? InputStream
+                ?: throw IllegalStateException("Response body does not contain an stream entity")
 
         stream.use { input ->
             // 4. Efficiently pipe stream blocks directly to disk (low memory usage)
@@ -72,7 +75,8 @@ class ImmichService {
 
         println("Successfully wrote asset binary stream to: ${targetOutputFile.absolutePath}")
 
-        return response.getHeaderString("Content-Type")
+        return response
+            .getHeaderString("Content-Type")
             .let { MediaType.valueOf(it) to getSuffixFromMimeType(it) }
     }
 
@@ -81,18 +85,27 @@ class ImmichService {
         assetResponse: AssetResponseDto,
         fileToUpload: File,
         mediaType: MediaType,
-    ): AssetMediaResponseDto = client.uploadAsset(apiKey, ClientMultipartForm.create()
-        .binaryFileUpload("assetData", fileToUpload.name, fileToUpload.absolutePath, mediaType.toString())
-        .attribute("deviceId", "quarkus-blocking-backend", "")
-        .attribute("deviceAssetId", "${fileToUpload.name}-${assetResponse.fileCreatedAt}", "")
-        .attribute("fileCreatedAt", assetResponse.fileCreatedAt, "")
-        .attribute("fileModifiedAt", assetResponse.fileModifiedAt, ""))
+    ): AssetMediaResponseDto =
+        client.uploadAsset(
+            apiKey,
+            ClientMultipartForm
+                .create()
+                .binaryFileUpload("assetData", fileToUpload.name, fileToUpload.absolutePath, mediaType.toString())
+                .attribute("deviceId", "quarkus-blocking-backend", "")
+                .attribute("deviceAssetId", "${fileToUpload.name}-${assetResponse.fileCreatedAt}", "")
+                .attribute("fileCreatedAt", assetResponse.fileCreatedAt, "")
+                .attribute("fileModifiedAt", assetResponse.fileModifiedAt, ""),
+        )
 
     private fun getSuffixFromMimeType(contentType: String?): HandledContentType {
         if (contentType.isNullOrBlank()) return HandledContentType.UNKNOWN
 
-        val subType = contentType.substringBefore(";").trim().lowercase()
-            .substringAfter("/", missingDelimiterValue = "")
+        val subType =
+            contentType
+                .substringBefore(";")
+                .trim()
+                .lowercase()
+                .substringAfter("/", missingDelimiterValue = "")
 
         return when (subType) {
             "jpeg", "jpg" -> HandledContentType.IMAGE_JPEG

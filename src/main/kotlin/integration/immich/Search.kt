@@ -6,7 +6,6 @@ import internal.serdes.UUIDSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import java.util.UUID
-import kotlin.time.Duration
 
 @Serializable
 data class SearchAssetsRequest(
@@ -17,26 +16,24 @@ data class SearchAssetsRequest(
     val isOffline: Boolean? = null,
     val make: String? = null,
     val model: String? = null,
-    val withExif: Boolean? = null
+    val withExif: Boolean? = null,
 )
-
 
 @Serializable
 data class SearchAssetsResponse(
-    //val albums: , // SearchAlbumResponseDto
-    val assets: SearchAssetResponseDto
+    // val albums: , // SearchAlbumResponseDto
+    val assets: SearchAssetResponseDto,
 )
 
 // 2. The inner container holding the array list
 @Serializable
 data class SearchAssetResponseDto(
     val count: Int,
-    //val facets
+    // val facets
     val items: List<AssetResponseDto>,
     val nextPage: String? = null,
     val total: Int,
 )
-
 
 @Serializable
 data class AssetResponseDto(
