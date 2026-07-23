@@ -72,6 +72,13 @@ interface ImmichClient {
         @HeaderParam(X_API_KEY) apiKey: String,
         requestBody: CopyAssetRequest,
     )
+
+    @GET
+    @Path("/assets/{id}")
+    fun getAssetInfo(
+        @HeaderParam(X_API_KEY) apiKey: String,
+        @PathParam("id") assetId: UUID,
+    ): AssetResponseDto
 }
 
 // /////////////////////////////////////

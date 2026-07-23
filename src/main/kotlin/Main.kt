@@ -1,8 +1,19 @@
+import database.AssetConversionStates
+import database.AssetStaged
+import database.AssetStagingAreaRepository
+import database.ConvertedAsset
+import database.ConvertedAssetStates
+import database.ConvertedAssetsRepository
+import database.UserInfo
+import database.UserInfoRepository
 import integration.immich.AssetMediaStatus
 import integration.immich.CopyAssetRequest
+import integration.immich.SearchAssetsResponse
 import io.quarkus.runtime.QuarkusApplication
 import io.quarkus.runtime.annotations.QuarkusMain
 import jakarta.inject.Inject
+import jakarta.persistence.EntityManager
+import jakarta.transaction.Transactional
 import services.HandledContentType
 import services.HandledContentType.IMAGE_JPEG
 import services.HandledContentType.IMAGE_PNG
@@ -10,7 +21,6 @@ import services.HandledContentType.UNKNOWN
 import services.ImmichService
 import java.io.File
 import java.nio.file.Files
-import java.util.UUID
 import kotlin.system.exitProcess
 
 data class Config(
@@ -22,17 +32,22 @@ data class Config(
     val immichServerUrl: String,
 )
 
-// TODO: entity
-data class UserInfo(
-    // val id: Int,
-    val name: String,
-    val apiKey: String,
-)
-
 @QuarkusMain
 class Main : QuarkusApplication {
     @Inject
+    lateinit var entityManager: EntityManager
+
+    @Inject
     lateinit var immichService: ImmichService
+
+    @Inject
+    lateinit var userInfoRepository: UserInfoRepository
+
+    @Inject
+    lateinit var assetStagingAreaRepository: AssetStagingAreaRepository
+
+    @Inject
+    lateinit var convertedAssetsRepository: ConvertedAssetsRepository
 
     private val defaultConfig =
         Config(
@@ -44,102 +59,140 @@ class Main : QuarkusApplication {
             immichServerUrl = "http://localhost:2283",
         )
 
-    private val defaultUserInfo =
-        UserInfo(
-            name = "dev_sandbox",
-            apiKey = "H2LzDTSsaJrogKz1T7Z7pWyDQV8UbVUzC0A9JCi9A",
-        )
+    @Transactional
+    fun fakeInitDb(): UserInfo {
+        if (userInfoRepository.listAll().isEmpty()) {
+            UserInfo(
+                apiKey = "H2LzDTSsaJrogKz1T7Z7pWyDQV8UbVUzC0A9JCi9A",
+                name = "dev_sandbox",
+                immichServerUrl = "http://localhost:2283"
+            ).also(userInfoRepository::persist)
+        }
 
-    private fun checkDb() {
+        return userInfoRepository.listAll().single().also { userInfo ->
+            entityManager.detach(userInfo)
+        }
+    }
+
+    @Transactional
+    fun queueNonConvertedAssets(
+        userInfo: UserInfo,
+        searchAssetsResponse: SearchAssetsResponse
+    ) {
+        val stagedAssetsIds = assetStagingAreaRepository.listAll().map { it.assetId }.toSet()
+
+        searchAssetsResponse.assets.items
+            .filter { !stagedAssetsIds.contains(it.id) }
+            .filter { !it.isTrashed }
+            .forEach { asset ->
+                AssetStaged(
+                    userId = userInfo.id,
+                    assetId = asset.id,
+                    currentState = AssetConversionStates.QUEUED,
+                ).also(assetStagingAreaRepository::persist)
+            }
+    }
+
+    fun processQueuedAssets(
+        userInfo: UserInfo,
+    ) {
+        val tmpDir = Files
+            .createTempDirectory("immich-upload-")
+            .toFile()
+            .also { it.deleteOnExit() }
+
+        assetStagingAreaRepository.getAllDetached().forEach { stagedAsset ->
+            val assetInfo = immichService.client.getAssetInfo(userInfo.apiKey, stagedAsset.assetId)
+
+            if (assetInfo.isTrashed) {
+                assetStagingAreaRepository.deleteById(stagedAsset.assetId)
+
+                return@forEach
+            }
+
+            val (_, suffix) = splitFileName(assetInfo.originalFileName)
+                .also { require(it.second.isNotBlank()) }
+
+            // Download the asset
+            val downloadFd = File(tmpDir, "originalDownloaded.$suffix")
+                .also { it.deleteOnExit() }
+
+            val (mediaType, fileType) = immichService.downloadAssetToDisk(
+                apiKey = userInfo.apiKey,
+                assetId = assetInfo.id,
+                targetOutputFile = downloadFd
+            )
+
+            // Convert it
+            val convertedFd = convertAsset(fileType, downloadFd, assetInfo.originalFileName, tmpDir)
+                .also { it.deleteOnExit() }
+
+            downloadFd.delete()
+
+            // Upload the converted asset
+            val uploadResponse = immichService
+                .uploadLocalFile(userInfo.apiKey, assetInfo, convertedFd, mediaType)
+                .also {
+                    require(it.status == AssetMediaStatus.CREATED) {
+                        "Immich said ${convertedFd.name} is a ${it.status}"
+                    }
+                }
+
+            // Save state
+            ConvertedAsset(
+                userId = userInfo.id,
+                assetId = uploadResponse.id,
+                currentState = ConvertedAssetStates.UPLOADED,
+            ).also(convertedAssetsRepository::store)
+
+
+            convertedFd.delete()
+
+            // Transfer metadata
+            immichService.client.copyAsset(
+                userInfo.apiKey,
+                CopyAssetRequest(
+                    albums = true,
+                    favorite = true,
+                    sharedLinks = true,
+                    sidecar = true,
+                    sourceId = assetInfo.id,
+                    stack = true,
+                    targetId = uploadResponse.id,
+                ),
+            )
+
+            TODO: save step to DB -> CONVERTED_METADATA_COPIED
+
+            /*
+            // TODO: Delete original
+
+            // TODO: save step to DB -> CONVERTED_REPLACEMENT_COMPLETE
+
+            // TODO: Delete from DB -> STAGED_ASSET
+
+             */
+        }
     }
 
     /**
      * TODO Gradle:
      *
      * TODO DB:
-     *
-     *  - migrations
      *  - docker volume
      *
      */
     override fun run(vararg args: String?): Int {
-        checkDb()
-        return 0
+        val defaultUserInfo = fakeInitDb()
 
-        val tmpDir =
-            Files
-                .createTempDirectory("immich-upload-")
-                .toFile()
-                .also { it.deleteOnExit() }
-
-        // If this goes through, enough to see the server is up and we can auth
-
+        // If this goes through: the server is up and we can auth
         require(immichService.client.authValidateToken(defaultUserInfo.apiKey).authStatus) {
             "The API key is invalid."
         }
 
-        val searchResponse = immichService.findRecentAssets(defaultUserInfo.apiKey)
+        queueNonConvertedAssets(defaultUserInfo, immichService.findRecentAssets(defaultUserInfo.apiKey))
 
-        // TODO: save new entries, filter out: already converted, trashed
-
-        searchResponse.assets.items.forEach { asset ->
-
-            val (_, suffix) = splitFileName(asset.originalFileName).also { require(it.second.isNotBlank()) }
-
-            val downloadFd = File(tmpDir, "originalDownloaded.$suffix")
-
-            val (mediaType, fileType) =
-                immichService.downloadAssetToDisk(
-                    apiKey = defaultUserInfo.apiKey,
-                    assetId = UUID.fromString("d2c65f57-5153-42a1-a0bb-91c821be63c6"),
-                    targetOutputFile = downloadFd,
-                )
-
-            //
-            val convertedFd = convertAsset(fileType, downloadFd, asset.originalFileName, tmpDir)
-
-            // TODO: move to finally
-            downloadFd.delete()
-
-            //
-            val uploadResponse =
-                immichService
-                    .uploadLocalFile(
-                        defaultUserInfo.apiKey,
-                        asset,
-                        convertedFd,
-                        mediaType,
-                    ).also {
-                        require(it.status == AssetMediaStatus.CREATED) {
-                            "Immich said ${convertedFd.name} is a ${it.status}"
-                        }
-                    }
-
-            // TODO: save step to DB
-
-            // TODO: move to finally
-            convertedFd.delete()
-
-            // Transfer metadata
-            immichService.client.copyAsset(
-                defaultUserInfo.apiKey,
-                CopyAssetRequest(
-                    albums = true,
-                    favorite = true,
-                    sharedLinks = true,
-                    sidecar = true,
-                    sourceId = asset.id,
-                    stack = true,
-                    targetId = uploadResponse.id,
-                ),
-            )
-
-            // TODO: save step to DB
-
-            // TODO: Delete original
-
-            // TODO: Delete from DB
-        }
+        processQueuedAssets(defaultUserInfo)
 
         return 0
     }
