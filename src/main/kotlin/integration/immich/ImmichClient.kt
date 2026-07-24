@@ -1,6 +1,7 @@
 package integration.immich
 
 import jakarta.ws.rs.Consumes
+import jakarta.ws.rs.DELETE
 import jakarta.ws.rs.GET
 import jakarta.ws.rs.HeaderParam
 import jakarta.ws.rs.POST
@@ -79,6 +80,13 @@ interface ImmichClient {
         @HeaderParam(X_API_KEY) apiKey: String,
         @PathParam("id") assetId: UUID,
     ): AssetResponseDto
+
+    @DELETE
+    @Path("/assets")
+    fun deleteAssets(
+        @HeaderParam(X_API_KEY) apiKey: String,
+        requestBody: DeleteAssetsRequest,
+    )
 }
 
 // /////////////////////////////////////

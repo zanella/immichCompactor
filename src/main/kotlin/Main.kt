@@ -1,13 +1,14 @@
 import database.AssetConversionStates
-import database.AssetStaged
 import database.AssetStagingAreaRepository
 import database.ConvertedAsset
 import database.ConvertedAssetStates
 import database.ConvertedAssetsRepository
+import database.StagedAsset
 import database.UserInfo
 import database.UserInfoRepository
 import integration.immich.AssetMediaStatus
 import integration.immich.CopyAssetRequest
+import integration.immich.DeleteAssetsRequest
 import integration.immich.SearchAssetsResponse
 import io.quarkus.runtime.QuarkusApplication
 import io.quarkus.runtime.annotations.QuarkusMain
@@ -65,7 +66,7 @@ class Main : QuarkusApplication {
             UserInfo(
                 apiKey = "H2LzDTSsaJrogKz1T7Z7pWyDQV8UbVUzC0A9JCi9A",
                 name = "dev_sandbox",
-                immichServerUrl = "http://localhost:2283"
+                immichServerUrl = "http://localhost:2283",
             ).also(userInfoRepository::persist)
         }
 
@@ -77,15 +78,29 @@ class Main : QuarkusApplication {
     @Transactional
     fun queueNonConvertedAssets(
         userInfo: UserInfo,
-        searchAssetsResponse: SearchAssetsResponse
+        searchAssetsResponse: SearchAssetsResponse,
     ) {
-        val stagedAssetsIds = assetStagingAreaRepository.listAll().map { it.assetId }.toSet()
+        val stagedAssetsIds =
+            assetStagingAreaRepository
+                .listAll()
+                // TODO: filter on query
+                .filter { it.currentState == AssetConversionStates.QUEUED }
+                .map { it.assetId }
+                .toSet()
+
+        val convertedAssetsIds =
+            convertedAssetsRepository
+                .listAll()
+                .map { it.assetId }
+                .toSet()
+
+        val skippableAssets = stagedAssetsIds + convertedAssetsIds
 
         searchAssetsResponse.assets.items
-            .filter { !stagedAssetsIds.contains(it.id) }
+            .filter { !skippableAssets.contains(it.id) }
             .filter { !it.isTrashed }
             .forEach { asset ->
-                AssetStaged(
+                StagedAsset(
                     userId = userInfo.id,
                     assetId = asset.id,
                     currentState = AssetConversionStates.QUEUED,
@@ -93,15 +108,14 @@ class Main : QuarkusApplication {
             }
     }
 
-    fun processQueuedAssets(
-        userInfo: UserInfo,
-    ) {
-        val tmpDir = Files
-            .createTempDirectory("immich-upload-")
-            .toFile()
-            .also { it.deleteOnExit() }
+    fun processQueuedAssets(userInfo: UserInfo) {
+        val tmpDir =
+            Files
+                .createTempDirectory("immich-upload-")
+                .toFile()
+                .also { it.deleteOnExit() }
 
-        assetStagingAreaRepository.getAllDetached().forEach { stagedAsset ->
+        assetStagingAreaRepository.getAll().forEach { stagedAsset ->
             val assetInfo = immichService.client.getAssetInfo(userInfo.apiKey, stagedAsset.assetId)
 
             if (assetInfo.isTrashed) {
@@ -110,41 +124,50 @@ class Main : QuarkusApplication {
                 return@forEach
             }
 
-            val (_, suffix) = splitFileName(assetInfo.originalFileName)
-                .also { require(it.second.isNotBlank()) }
+            val (_, suffix) =
+                splitFileName(assetInfo.originalFileName)
+                    .also { require(it.second.isNotBlank()) }
 
             // Download the asset
-            val downloadFd = File(tmpDir, "originalDownloaded.$suffix")
-                .also { it.deleteOnExit() }
+            val downloadFd =
+                File(tmpDir, "originalDownloaded.$suffix")
+                    .also { it.deleteOnExit() }
 
-            val (mediaType, fileType) = immichService.downloadAssetToDisk(
-                apiKey = userInfo.apiKey,
-                assetId = assetInfo.id,
-                targetOutputFile = downloadFd
-            )
+            val (mediaType, fileType) =
+                immichService.downloadAssetToDisk(
+                    apiKey = userInfo.apiKey,
+                    assetId = assetInfo.id,
+                    targetOutputFile = downloadFd,
+                )
 
             // Convert it
-            val convertedFd = convertAsset(fileType, downloadFd, assetInfo.originalFileName, tmpDir)
-                .also { it.deleteOnExit() }
+            val convertedFd =
+                convertAsset(fileType, downloadFd, assetInfo.originalFileName, tmpDir)
+                    .also { it.deleteOnExit() }
 
             downloadFd.delete()
 
             // Upload the converted asset
-            val uploadResponse = immichService
-                .uploadLocalFile(userInfo.apiKey, assetInfo, convertedFd, mediaType)
-                .also {
-                    require(it.status == AssetMediaStatus.CREATED) {
-                        "Immich said ${convertedFd.name} is a ${it.status}"
+            val uploadResponse =
+                immichService
+                    .uploadLocalFile(userInfo.apiKey, assetInfo, convertedFd, mediaType)
+                    .also {
+                        /*
+                         * TODO: If the application dies right after here, it won't be CREATED,
+                         *  what to do then ?
+                         */
+                        require(it.status == AssetMediaStatus.CREATED) {
+                            "Immich said ${convertedFd.name} is a ${it.status}"
+                        }
                     }
-                }
 
-            // Save state
-            ConvertedAsset(
-                userId = userInfo.id,
-                assetId = uploadResponse.id,
-                currentState = ConvertedAssetStates.UPLOADED,
-            ).also(convertedAssetsRepository::store)
-
+            // Replacement: Save state
+            val replacementEntity =
+                ConvertedAsset(
+                    userId = userInfo.id,
+                    assetId = uploadResponse.id,
+                    currentState = ConvertedAssetStates.UPLOADED,
+                ).also(convertedAssetsRepository::store)
 
             convertedFd.delete()
 
@@ -162,21 +185,22 @@ class Main : QuarkusApplication {
                 ),
             )
 
-            TODO: save step to DB -> CONVERTED_METADATA_COPIED
+            stagedAsset.currentState = AssetConversionStates.OBSOLETE
+            replacementEntity.currentState = ConvertedAssetStates.COMPLETE
 
-            /*
-            // TODO: Delete original
+            // Send original asset to trash
+            immichService.client.deleteAssets(
+                userInfo.apiKey,
+                DeleteAssetsRequest(ids = listOf(assetInfo.id), force = false),
+            )
 
-            // TODO: save step to DB -> CONVERTED_REPLACEMENT_COMPLETE
-
-            // TODO: Delete from DB -> STAGED_ASSET
-
-             */
+            assetStagingAreaRepository.dropById(assetInfo.id)
         }
     }
 
     /**
      * TODO Gradle:
+     *  - Compile with GraalVM
      *
      * TODO DB:
      *  - docker volume
@@ -189,6 +213,8 @@ class Main : QuarkusApplication {
         require(immichService.client.authValidateToken(defaultUserInfo.apiKey).authStatus) {
             "The API key is invalid."
         }
+
+        // TODO: handle assets left in between
 
         queueNonConvertedAssets(defaultUserInfo, immichService.findRecentAssets(defaultUserInfo.apiKey))
 

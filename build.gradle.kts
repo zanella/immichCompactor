@@ -2,6 +2,7 @@ plugins {
     val kotlinVersion = "2.3.21"
 
     kotlin("jvm") version kotlinVersion
+    kotlin("plugin.allopen") version kotlinVersion
     kotlin("plugin.serialization") version kotlinVersion
 
     id("io.quarkus")
@@ -54,6 +55,14 @@ dependencies {
 
 kotlin {
     jvmToolchain(25)
+}
+
+allOpen {
+    annotation("jakarta.ws.rs.Path")
+    annotation("jakarta.enterprise.context.ApplicationScoped")
+    annotation("jakarta.persistence.Entity")
+    annotation("io.quarkus.test.junit.QuarkusTest")
+    annotation("jakarta.transaction.Transactional")
 }
 
 tasks.test {
