@@ -6,7 +6,7 @@ plugins {
     kotlin("plugin.serialization") version kotlinVersion
 
     id("io.quarkus")
-    id("com.google.osdetector") version "1.7.3"
+    id("io.mvnpm.gradle.plugin.native-java-plugin") version "1.0.0"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
 }
 
@@ -28,7 +28,9 @@ dependencies {
     implementation("io.quarkus:quarkus-kotlin")
     implementation("io.quarkus:quarkus-config-yaml")
 
-    // Rest
+    // REST
+    implementation("io.quarkus:quarkus-rest")
+    implementation("io.quarkus:quarkus-rest-qute")
     implementation("io.quarkus:quarkus-rest-client")
     implementation("io.quarkus:quarkus-rest-client-kotlin-serialization")
 
@@ -44,11 +46,13 @@ dependencies {
     runtimeOnly("org.flywaydb:flyway-database-postgresql:10.20.0")
 
     // Validation
-    implementation("org.hibernate.validator:hibernate-validator:8.0.1.Final")
-    implementation("io.quarkus:quarkus-hibernate-validator")
+    // implementation("org.hibernate.validator:hibernate-validator:8.0.1.Final")
+    // implementation("io.quarkus:quarkus-hibernate-validator")
 
-    // Utils
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    // FrontEnd
+    implementation("io.quarkiverse.web-bundler:quarkus-web-bundler:2.3.3")
+    implementation("io.quarkus:quarkus-qute")
+    compileOnly("org.mvnpm:htmx.org:2.0.1")
 
     testImplementation(kotlin("test"))
 }

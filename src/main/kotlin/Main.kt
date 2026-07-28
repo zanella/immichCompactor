@@ -10,8 +10,6 @@ import integration.immich.AssetMediaStatus
 import integration.immich.CopyAssetRequest
 import integration.immich.DeleteAssetsRequest
 import integration.immich.SearchAssetsResponse
-import io.quarkus.runtime.QuarkusApplication
-import io.quarkus.runtime.annotations.QuarkusMain
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
@@ -33,8 +31,8 @@ data class Config(
     val immichServerUrl: String,
 )
 
-@QuarkusMain
-class Main : QuarkusApplication {
+// @QuarkusMain
+class Main { // : QuarkusApplication {
     @Inject
     lateinit var entityManager: EntityManager
 
@@ -131,6 +129,7 @@ class Main : QuarkusApplication {
             // Download the asset
             val downloadFd =
                 File(tmpDir, "originalDownloaded.$suffix")
+                    // TODO: move to finally
                     .also { it.deleteOnExit() }
 
             val (mediaType, fileType) =
@@ -143,6 +142,7 @@ class Main : QuarkusApplication {
             // Convert it
             val convertedFd =
                 convertAsset(fileType, downloadFd, assetInfo.originalFileName, tmpDir)
+                    // TOOD: move to finally
                     .also { it.deleteOnExit() }
 
             downloadFd.delete()
@@ -198,7 +198,7 @@ class Main : QuarkusApplication {
         }
     }
 
-    /**
+    /*
      * TODO Gradle:
      *  - Compile with GraalVM
      *
@@ -206,7 +206,7 @@ class Main : QuarkusApplication {
      *  - docker volume
      *
      */
-    override fun run(vararg args: String?): Int {
+    fun run(vararg args: String?): Int {
         val defaultUserInfo = fakeInitDb()
 
         // If this goes through: the server is up and we can auth

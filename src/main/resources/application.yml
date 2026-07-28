@@ -1,8 +1,13 @@
 quarkus:
   datasource:
+    db-kind: postgresql
+    username: postgres
+    password: postgres
+    jdbc:
+      # TODO: point to the docker container from the same compose
+      url: jdbc:postgresql://localhost:5435/immich_compactor
     devservices:
-      enabled:
-        false
+      enabled: false
   flyway:
     migrate-at-start: true
 
