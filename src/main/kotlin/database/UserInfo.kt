@@ -5,20 +5,22 @@ import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepositoryBase
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EntityNotFoundException
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.LockModeType
 import jakarta.persistence.Table
 
 @Entity
 @Table(name = "user_info")
 data class UserInfo(
     @Column("api_key")
-    val apiKey: String,
+    var apiKey: String,
     @Column
-    val name: String,
+    var name: String,
     @Column("immich_server_url")
-    val immichServerUrl: String,
+    var immichServerUrl: String,
 ) : PanacheEntityBase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,8 +34,9 @@ data class UserInfo(
 @ApplicationScoped
 class UserInfoRepository : PanacheRepositoryBase<UserInfo, Long>
 
-/* inline fun <reified E : Any, T : Any> PanacheRepositoryBase<E, T>.getById(
+inline fun <reified E : Any, T : Any> PanacheRepositoryBase<E, T>.getById(
     id: T,
-    lockModeType: LockModeType = NONE
+    lockModeType: LockModeType = LockModeType.NONE,
 ): E =
-    findById(id, lockModeType) ?: throw EntityNotFoundException("${E::class.simpleName} not found with id: $id") */
+    findById(id, lockModeType)
+        ?: throw EntityNotFoundException("${E::class.simpleName} not found with id: $id")

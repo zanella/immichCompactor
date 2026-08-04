@@ -1,9 +1,10 @@
 
-import 'htmx.org';
+import './app.css';
+// import 'htmx.org';
 
-console.log("HTMX and TypeScript loaded successfully!");
+//console.log("HTMX and TypeScript loaded successfully!");
 
-interface User {
+/* interface User {
     name: string;
     isAdmin: boolean;
 }
@@ -18,4 +19,4 @@ function greetUser(user: User): void {
 
 // Execute on load
 const currentUser: User = { name: "Kotlin Developer", isAdmin: true };
-greetUser(currentUser);
+greetUser(currentUser); */

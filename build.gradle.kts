@@ -51,8 +51,9 @@ dependencies {
 
     // FrontEnd
     implementation("io.quarkiverse.web-bundler:quarkus-web-bundler:2.3.3")
+    implementation("io.quarkiverse.web-bundler:quarkus-web-bundler-tailwindcss:2.3.3")
     implementation("io.quarkus:quarkus-qute")
-    compileOnly("org.mvnpm:htmx.org:2.0.1")
+    // TODO: worth it ? compileOnly("org.mvnpm:htmx.org:2.0.1")
 
     testImplementation(kotlin("test"))
 }

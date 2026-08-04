@@ -1,16 +1,24 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Immich Compactor</title>
+{#include base.html}
+    {#title}Users{/title}
 
-    <!-- THIS automatically injects the correct hashed JS and CSS tags! -->
-        {#bundle /}
+    {#body}
+        <div class="bg-white p-8 rounded-lg shadow-sm border border-gray-100">
 
-    <h1 id="greeting">Loading greeting...</h1>
+            <!-- TODO: userAdd page -->
 
-</head>
-<body>
-<!-- your content -->
-</body>
-</html>
+            <button class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors">
+                Get Started
+            </button>
+
+            {#for user in users}
+                <div class="flex items-center gap-4 py-2 border-b border-gray-100">
+                    <span>{user.name}</span>
+                    <a href="/users/{user.id}"
+                       class="px-4 py-1 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-colors">
+                        Info
+                    </a>
+                </div>
+            {/for}
+        </div>
+    {/body}
+{/include}

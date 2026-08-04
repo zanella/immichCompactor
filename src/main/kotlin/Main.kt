@@ -37,9 +37,6 @@ class Main { // : QuarkusApplication {
     lateinit var entityManager: EntityManager
 
     @Inject
-    lateinit var immichService: ImmichService
-
-    @Inject
     lateinit var userInfoRepository: UserInfoRepository
 
     @Inject
@@ -57,6 +54,8 @@ class Main { // : QuarkusApplication {
             dbOwnDbName = "immich_compactor",
             immichServerUrl = "http://localhost:2283",
         )
+
+    private val immichService = ImmichService(defaultConfig.immichServerUrl)
 
     @Transactional
     fun fakeInitDb(): UserInfo {

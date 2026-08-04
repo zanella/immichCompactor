@@ -5,7 +5,6 @@ import integration.immich.AssetResponseDto
 import integration.immich.ImmichClient
 import integration.immich.SearchAssetsRequest
 import integration.immich.SearchAssetsResponse
-import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.MediaType
 import org.eclipse.microprofile.rest.client.RestClientBuilder
 import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
@@ -18,14 +17,13 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
-@ApplicationScoped
-class ImmichService {
+class ImmichService(
+    private val baseUrl: String,
+) {
     val client: ImmichClient by lazy {
-        val dynamicBaseUrl = "http://localhost:2283"
-
         RestClientBuilder
             .newBuilder()
-            .baseUri(URI.create(dynamicBaseUrl))
+            .baseUri(URI.create(baseUrl))
             // 1. Enable built-in network logging scope
             .property("quarkus.rest-client.logging.scope", "request-response")
             // 2. Set max body log limits in characters

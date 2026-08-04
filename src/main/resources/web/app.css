@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Add any custom CSS overrides here if needed */
+.custom-shadow {
+    @apply shadow-lg shadow-indigo-500/50;
+}
