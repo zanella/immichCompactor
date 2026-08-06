@@ -17,7 +17,7 @@ import java.util.UUID
 @Table(name = "converted_assets")
 data class ConvertedAsset(
     @Column("user_id")
-    val userId: Long,
+    val userId: UserId,
     @Id
     @Column("asset_id")
     val assetId: UUID,

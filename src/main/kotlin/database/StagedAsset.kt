@@ -16,7 +16,7 @@ import java.util.UUID
 @Table(name = "assets_staging_area")
 data class StagedAsset(
     @Column("user_id")
-    val userId: Long,
+    val userId: UserId,
     @Id
     @Column(name = "asset_id")
     val assetId: UUID,

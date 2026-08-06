@@ -1,54 +1,125 @@
 package services
 
-import integration.immich.AssetMediaResponseDto
-import integration.immich.AssetResponseDto
+import database.AssetConversionStates
+import database.AssetStagingAreaRepository
+import database.ConvertedAssetsRepository
+import database.StagedAsset
+import database.UserId
 import integration.immich.ImmichClient
 import integration.immich.SearchAssetsRequest
 import integration.immich.SearchAssetsResponse
-import jakarta.ws.rs.core.MediaType
+import io.quarkus.narayana.jta.QuarkusTransaction
+import jakarta.enterprise.context.ApplicationScoped
 import org.eclipse.microprofile.rest.client.RestClientBuilder
-import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
-import java.io.File
-import java.io.InputStream
 import java.net.URI
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.time.Instant
-import java.time.temporal.ChronoUnit
-import java.util.UUID
 
+@ApplicationScoped
 class ImmichService(
-    private val baseUrl: String,
+    private val assetStagingAreaRepository: AssetStagingAreaRepository,
+    private val convertedAssetsRepository: ConvertedAssetsRepository,
 ) {
-    val client: ImmichClient by lazy {
+    /**
+     * I don't want to wrap the whole API, leak the client for now and decide later if it should be hidden
+     */
+    fun instantiateClient(
+        baseUrl: String,
+        isDebug: Boolean = false,
+    ): ImmichClient =
         RestClientBuilder
             .newBuilder()
             .baseUri(URI.create(baseUrl))
-            // 1. Enable built-in network logging scope
-            .property("quarkus.rest-client.logging.scope", "request-response")
-            // 2. Set max body log limits in characters
-            .property("quarkus.rest-client.logging.body-limit", "50000")
-            // .register(ImmichLoggingFilter::class.java)
-            .build(ImmichClient::class.java)
-    }
+            .also {
+                if (isDebug) {
+                    // 1. Enable built-in network logging scope
+                    it.property("quarkus.rest-client.logging.scope", "request-response")
+                    // 2. Set max body log limits in characters
+                    it.property("quarkus.rest-client.logging.body-limit", "50000")
+                    // .register(ImmichLoggingFilter::class.java)
+                }
+            }.build(ImmichClient::class.java)
 
-    fun findRecentAssets(apiKey: String): SearchAssetsResponse {
-        // Generate an ISO 8601 timestamp string for exactly 30 days ago
-        val thirtyDaysAgoIsoString =
-            Instant
-                .now()
-                .minus(30, ChronoUnit.DAYS)
-                .toString()
-
+    fun findAllAssets(
+        apiKey: String,
+        client: ImmichClient,
+        page: Int = 1,
+    ): SearchAssetsResponse {
         val searchCriteria =
             SearchAssetsRequest(
-                createdAfter = thirtyDaysAgoIsoString,
+                createdAfter = Instant.EPOCH.toString(),
+                page = page,
             )
 
         return client.searchByMetadata(apiKey, searchCriteria)
     }
 
-    fun downloadAssetToDisk(
+    data class FindAndEnqueueAllAssetsResponse(
+        val assetsFound: Long,
+        val assetsQueued: Long,
+    )
+
+    /**
+     * Walks every page of the recent-assets search. Immich returns the number of the
+     * next page in [SearchAssetResponseDto.nextPage] (null once there are no more), which
+     * we feed back into the following request until it runs out.
+     */
+    fun findAndEnqueueAllAssets(
+        apiKey: String,
+        userId: UserId,
+        client: ImmichClient,
+    ): FindAndEnqueueAllAssetsResponse {
+        /*
+         * TODO: https://api.immich.app/endpoints/jobs/getQueuesLegacy
+         *
+         * The endpoint above is deprecated, so... can't be sure there are no jobs running :-/
+         */
+
+        val stagedAssetsIds =
+            assetStagingAreaRepository
+                .listAll()
+                // TODO: filter on DB query, instead of return
+                .filter { it.currentState == AssetConversionStates.QUEUED }
+                .map { it.assetId }
+                .toSet()
+
+        // TODO: If the amount is huge -> think how to handle
+        val convertedAssetsIds = convertedAssetsRepository.listAll().map { it.assetId }.toSet()
+
+        val skippableAssets = stagedAssetsIds + convertedAssetsIds
+
+        var assetsFound = 0L
+        var assetsQueued = 0L
+        var page: Int? = 1
+
+        while (page != null) {
+            val searchAssetsResponse = findAllAssets(apiKey, client, page).assets
+
+            val assetsToBeStaged =
+                searchAssetsResponse.items
+                    .filter { !skippableAssets.contains(it.id) }
+                    .filter { !it.isTrashed }
+                    .map { asset ->
+                        StagedAsset(
+                            userId = userId,
+                            assetId = asset.id,
+                            currentState = AssetConversionStates.QUEUED,
+                        )
+                    }
+
+            QuarkusTransaction.requiringNew().run {
+                assetsToBeStaged.forEach(assetStagingAreaRepository::persist)
+            }
+
+            assetsFound += searchAssetsResponse.items.size
+            assetsQueued += assetsToBeStaged.size
+
+            page = searchAssetsResponse.nextPage?.toInt()
+        }
+
+        return FindAndEnqueueAllAssetsResponse(assetsFound = assetsFound, assetsQueued = assetsQueued)
+    }
+
+    /* fun downloadAssetToDisk(
         apiKey: String,
         assetId: UUID,
         targetOutputFile: File,
@@ -93,7 +164,9 @@ class ImmichService(
                 .attribute("deviceAssetId", "${fileToUpload.name}-${assetResponse.fileCreatedAt}", "")
                 .attribute("fileCreatedAt", assetResponse.fileCreatedAt, "")
                 .attribute("fileModifiedAt", assetResponse.fileModifiedAt, ""),
-        )
+        ) */
+
+    // /////////////////////////////////////////////////////////////////////////
 
     private fun getSuffixFromMimeType(contentType: String?): HandledContentType {
         if (contentType.isNullOrBlank()) return HandledContentType.UNKNOWN

@@ -1,5 +1,6 @@
 package api
 
+import database.UserId
 import database.UserInfoRepository
 import database.getById
 import io.quarkus.narayana.jta.QuarkusTransaction
@@ -14,17 +15,29 @@ import jakarta.ws.rs.Path
 import jakarta.ws.rs.PathParam
 import jakarta.ws.rs.Produces
 import jakarta.ws.rs.core.MediaType
-import jakarta.ws.rs.core.Response
+import services.AssetRefreshJobService
 import services.ImmichService
-import java.net.URI
 
 @Path("/")
 class UserResource(
+    private val assetRefreshJobService: AssetRefreshJobService,
+    private val immichService: ImmichService,
     private val userInfoRepository: UserInfoRepository,
+    //
     @param:Location("index.html")
     private val users: Template,
+    //
     @param:Location("user_details.html")
     private val userDetails: Template,
+    //
+    @param:Location("user_form.html")
+    private val userForm: Template,
+    //
+    @param:Location("assets.html")
+    private val assets: Template,
+    //
+    @param:Location("assets_status.html")
+    private val assetsStatus: Template,
 ) {
     @GET
     @Produces(MediaType.TEXT_HTML)
@@ -37,61 +50,112 @@ class UserResource(
     @Path("/users/{id}")
     @Produces(MediaType.TEXT_HTML)
     fun user(
-        @PathParam("id") id: Long,
+        @PathParam("id") id: UserId,
     ): TemplateInstance =
-        userInfoRepository.getById(id).let {
-            userForm(it.id, it.name, it.immichServerUrl, it.apiKey)
+        userInfoRepository.getById(id.value).let {
+            userData(userDetails.instance(), id, it.name, it.immichServerUrl, it.apiKey)
         }
+
+    @GET
+    @Path("/users/{id}/assets")
+    @Produces(MediaType.TEXT_HTML)
+    fun userAssets(
+        @PathParam("id") id: UserId,
+    ): TemplateInstance =
+        userInfoRepository.getById(id.value).let {
+            assets
+                .instance()
+                .data("id", id.value)
+                .data("name", it.name)
+        }
+
+    @GET
+    @Path("/users/{id}/assets/status")
+    @Produces(MediaType.TEXT_HTML)
+    fun assetsRefreshStatus(
+        @PathParam("id") id: UserId,
+    ): TemplateInstance = assetsRefreshStatusFragment(id, assetRefreshJobService.status(id))
+
+    @POST
+    @Path("/users/{id}/assets/refresh")
+    @Produces(MediaType.TEXT_HTML)
+    fun refreshAssets(
+        @PathParam("id") id: UserId,
+    ): TemplateInstance {
+        userInfoRepository.getById(id.value).also {
+            assetRefreshJobService.start(id, it.apiKey, it.immichServerUrl)
+        }
+
+        return assetsRefreshStatusFragment(id, assetRefreshJobService.status(id))
+    }
 
     @POST
     @Path("/users/{id}")
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.TEXT_HTML)
     fun updateUser(
-        @PathParam("id") id: Long,
+        @PathParam("id") id: UserId,
         @FormParam("name") name: String,
         @FormParam("immichServerUrl") immichServerUrl: String,
         @FormParam("apiKey") apiKey: String,
-    ): Response {
+    ): TemplateInstance {
         // Validate the supplied API key against the supplied server, before touching the DB.
         val valid =
             runCatching {
-                ImmichService(immichServerUrl).client.authValidateToken(apiKey).authStatus
+                immichService.instantiateClient(immichServerUrl).authValidateToken(apiKey).authStatus
             }.getOrDefault(false)
 
         if (!valid) {
-            return Response
-                .status(Response.Status.BAD_REQUEST)
-                .entity(
-                    userForm(id, name, immichServerUrl, apiKey)
-                        .data("error", "Immich rejected this API key — changes were not saved."),
-                ).build()
+            return userData(
+                userForm.instance(),
+                id,
+                name,
+                immichServerUrl,
+                apiKey,
+                error = "Immich rejected this API key — changes were not saved.",
+            )
         }
 
         // Only now open a transaction to persist the edit (flushed on commit).
         QuarkusTransaction.requiringNew().run {
-            userInfoRepository.getById(id).also {
+            userInfoRepository.getById(id.value).also {
                 it.name = name
                 it.immichServerUrl = immichServerUrl
                 it.apiKey = apiKey
             }
         }
 
-        // Redirect back.
-        return Response.seeOther(URI.create("/users/$id")).build()
+        return userData(userForm.instance(), id, name, immichServerUrl, apiKey, saved = true)
     }
 
-    private fun userForm(
-        id: Long,
+    private fun userData(
+        instance: TemplateInstance,
+        id: UserId,
         name: String,
         immichServerUrl: String,
         apiKey: String,
+        saved: Boolean = false,
+        error: String? = null,
     ): TemplateInstance =
-        userDetails
-            .instance()
-            .data("id", id)
+        instance
+            .data("id", id.value)
             .data("name", name)
             .data("immichServerUrl", immichServerUrl)
             .data("apiKey", apiKey)
-            .data("error", null)
+            .data("saved", saved)
+            .data("error", error)
+
+    private fun assetsRefreshStatusFragment(
+        id: UserId,
+        status: AssetRefreshJobService.JobStatus,
+    ): TemplateInstance =
+        assetsStatus
+            .instance()
+            .data("id", id.value)
+            .data("running", status.state == AssetRefreshJobService.State.RUNNING)
+            .data("done", status.state == AssetRefreshJobService.State.DONE)
+            .data("failed", status.state == AssetRefreshJobService.State.FAILED)
+            .data("assetsFound", status.assetsFound)
+            .data("assetsQueued", status.assetsQueued)
+            .data("error", status.error)
 }

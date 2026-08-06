@@ -17,6 +17,7 @@ data class SearchAssetsRequest(
     val make: String? = null,
     val model: String? = null,
     val withExif: Boolean? = null,
+    val page: Int? = null,
 )
 
 @Serializable

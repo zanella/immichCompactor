@@ -27,6 +27,7 @@ data class UserInfo(
     @Column(name = "id")
     private var _id: Long? = null
 
+    // TODO: return value class
     val id: Long
         get() = _id ?: throw IllegalStateException("Entity is not persisted yet")
 }

@@ -5,36 +5,7 @@
         <div class="bg-white p-8 rounded-lg shadow-sm border border-gray-100">
             <a href="/" class="text-indigo-600 hover:underline text-sm">&larr; Back to users</a>
 
-            <h2 class="text-3xl font-extrabold text-indigo-600 mt-4 mb-6">{name}</h2>
-
-            {#if error}
-                <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-                    {error}
-                </div>
-            {/if}
-
-            <form method="post" action="/users/{id}" class="space-y-4">
-                <div>
-                    <label for="name" class="block text-sm font-semibold text-gray-500 mb-1">User Name</label>
-                    <input id="name" name="name" type="text" value="{name}"
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
-                <div>
-                    <label for="immichServerUrl" class="block text-sm font-semibold text-gray-500 mb-1">Immich Server URL</label>
-                    <input id="immichServerUrl" name="immichServerUrl" type="text" value="{immichServerUrl}"
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
-                <div>
-                    <label for="apiKey" class="block text-sm font-semibold text-gray-500 mb-1">API Key</label>
-                    <input id="apiKey" name="apiKey" type="text" value="{apiKey}"
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
-
-                <button type="submit"
-                        class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors">
-                    Save changes
-                </button>
-            </form>
+            {#include user_form.html /}
         </div>
     {/body}
 {/include}

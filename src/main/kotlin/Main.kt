@@ -1,25 +1,15 @@
-import database.AssetConversionStates
 import database.AssetStagingAreaRepository
-import database.ConvertedAsset
-import database.ConvertedAssetStates
 import database.ConvertedAssetsRepository
-import database.StagedAsset
 import database.UserInfo
 import database.UserInfoRepository
-import integration.immich.AssetMediaStatus
-import integration.immich.CopyAssetRequest
-import integration.immich.DeleteAssetsRequest
-import integration.immich.SearchAssetsResponse
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
-import jakarta.transaction.Transactional
 import services.HandledContentType
 import services.HandledContentType.IMAGE_JPEG
 import services.HandledContentType.IMAGE_PNG
 import services.HandledContentType.UNKNOWN
 import services.ImmichService
 import java.io.File
-import java.nio.file.Files
 import kotlin.system.exitProcess
 
 data class Config(
@@ -55,57 +45,17 @@ class Main { // : QuarkusApplication {
             immichServerUrl = "http://localhost:2283",
         )
 
-    private val immichService = ImmichService(defaultConfig.immichServerUrl)
+    private val defaultUserInfo =
+        UserInfo(
+            apiKey = "H2LzDTSsaJrogKz1T7Z7pWyDQV8UbVUzC0A9JCi9A",
+            name = "dev_sandbox",
+            immichServerUrl = "http://localhost:2283",
+        )
 
-    @Transactional
-    fun fakeInitDb(): UserInfo {
-        if (userInfoRepository.listAll().isEmpty()) {
-            UserInfo(
-                apiKey = "H2LzDTSsaJrogKz1T7Z7pWyDQV8UbVUzC0A9JCi9A",
-                name = "dev_sandbox",
-                immichServerUrl = "http://localhost:2283",
-            ).also(userInfoRepository::persist)
-        }
+    private val immichService = ImmichService(assetStagingAreaRepository, convertedAssetsRepository)
+    private val client = immichService.instantiateClient(defaultConfig.immichServerUrl)
 
-        return userInfoRepository.listAll().single().also { userInfo ->
-            entityManager.detach(userInfo)
-        }
-    }
-
-    @Transactional
-    fun queueNonConvertedAssets(
-        userInfo: UserInfo,
-        searchAssetsResponse: SearchAssetsResponse,
-    ) {
-        val stagedAssetsIds =
-            assetStagingAreaRepository
-                .listAll()
-                // TODO: filter on query
-                .filter { it.currentState == AssetConversionStates.QUEUED }
-                .map { it.assetId }
-                .toSet()
-
-        val convertedAssetsIds =
-            convertedAssetsRepository
-                .listAll()
-                .map { it.assetId }
-                .toSet()
-
-        val skippableAssets = stagedAssetsIds + convertedAssetsIds
-
-        searchAssetsResponse.assets.items
-            .filter { !skippableAssets.contains(it.id) }
-            .filter { !it.isTrashed }
-            .forEach { asset ->
-                StagedAsset(
-                    userId = userInfo.id,
-                    assetId = asset.id,
-                    currentState = AssetConversionStates.QUEUED,
-                ).also(assetStagingAreaRepository::persist)
-            }
-    }
-
-    fun processQueuedAssets(userInfo: UserInfo) {
+    /*fun processQueuedAssets(userInfo: UserInfo) {
         val tmpDir =
             Files
                 .createTempDirectory("immich-upload-")
@@ -113,7 +63,7 @@ class Main { // : QuarkusApplication {
                 .also { it.deleteOnExit() }
 
         assetStagingAreaRepository.getAll().forEach { stagedAsset ->
-            val assetInfo = immichService.client.getAssetInfo(userInfo.apiKey, stagedAsset.assetId)
+            val assetInfo = client.getAssetInfo(userInfo.apiKey, stagedAsset.assetId)
 
             if (assetInfo.isTrashed) {
                 assetStagingAreaRepository.deleteById(stagedAsset.assetId)
@@ -152,9 +102,9 @@ class Main { // : QuarkusApplication {
                     .uploadLocalFile(userInfo.apiKey, assetInfo, convertedFd, mediaType)
                     .also {
                         /*
-                         * TODO: If the application dies right after here, it won't be CREATED,
-                         *  what to do then ?
-                         */
+     * TODO: If the application dies right after here, it won't be CREATED,
+     *  what to do then ?
+     */
                         require(it.status == AssetMediaStatus.CREATED) {
                             "Immich said ${convertedFd.name} is a ${it.status}"
                         }
@@ -163,7 +113,7 @@ class Main { // : QuarkusApplication {
             // Replacement: Save state
             val replacementEntity =
                 ConvertedAsset(
-                    userId = userInfo.id,
+                    userId = UserId(userInfo.id),
                     assetId = uploadResponse.id,
                     currentState = ConvertedAssetStates.UPLOADED,
                 ).also(convertedAssetsRepository::store)
@@ -184,6 +134,9 @@ class Main { // : QuarkusApplication {
                 ),
             )
 
+            // TODO: https://api.immich.app/endpoints/tags/bulkTagAssets
+            // Tag the assets that have been converted
+
             stagedAsset.currentState = AssetConversionStates.OBSOLETE
             replacementEntity.currentState = ConvertedAssetStates.COMPLETE
 
@@ -195,9 +148,9 @@ class Main { // : QuarkusApplication {
 
             assetStagingAreaRepository.dropById(assetInfo.id)
         }
-    }
+    } * /
 
-    /*
+    / *
      * TODO Gradle:
      *  - Compile with GraalVM
      *
@@ -206,18 +159,9 @@ class Main { // : QuarkusApplication {
      *
      */
     fun run(vararg args: String?): Int {
-        val defaultUserInfo = fakeInitDb()
-
-        // If this goes through: the server is up and we can auth
-        require(immichService.client.authValidateToken(defaultUserInfo.apiKey).authStatus) {
-            "The API key is invalid."
-        }
-
         // TODO: handle assets left in between
 
-        queueNonConvertedAssets(defaultUserInfo, immichService.findRecentAssets(defaultUserInfo.apiKey))
-
-        processQueuedAssets(defaultUserInfo)
+        // processQueuedAssets(defaultUserInfo)
 
         return 0
     }

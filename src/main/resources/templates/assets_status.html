@@ -1,0 +1,22 @@
+<div id="asset-refresh"
+     {#if running}hx-get="/users/{id}/assets/status" hx-trigger="every 2s" hx-swap="outerHTML"{/if}>
+    <button hx-post="/users/{id}/assets/refresh" hx-target="#asset-refresh" hx-swap="outerHTML"
+            {#if running}disabled{/if}
+            class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        {#if running}Refreshing…{#else}Refresh{/if}
+    </button>
+
+    {#if running}
+        <div class="mt-4 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-sm">
+            Scanning Immich and queuing assets…
+        </div>
+    {#else if done}
+        <div class="mt-4 px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm">
+            Found {assetsFound} asset(s); queued {assetsQueued} new one(s) for conversion.
+        </div>
+    {#else if failed}
+        <div class="mt-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+            Refresh failed: {error}
+        </div>
+    {/if}
+</div>
