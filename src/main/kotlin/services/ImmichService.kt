@@ -74,18 +74,24 @@ class ImmichService(
          * The endpoint above is deprecated, so... can't be sure there are no jobs running :-/
          */
 
-        val stagedAssetsIds =
-            assetStagingAreaRepository
-                .listAll()
-                // TODO: filter on DB query, instead of return
-                .filter { it.currentState == AssetConversionStates.QUEUED }
-                .map { it.assetId }
-                .toSet()
+        // This runs on a bare virtual thread (no CDI request context), so DB access needs
+        // explicit transactions — Panache's built-in reads only *join* a transaction,
+        // they can't start one themselves.
+        val skippableAssets =
+            QuarkusTransaction.joiningExisting().call {
+                val stagedAssetsIds =
+                    assetStagingAreaRepository
+                        .listAll()
+                        // TODO: filter on DB query, instead of return
+                        .filter { it.currentState == AssetConversionStates.QUEUED }
+                        .map { it.assetId }
+                        .toSet()
 
-        // TODO: If the amount is huge -> think how to handle
-        val convertedAssetsIds = convertedAssetsRepository.listAll().map { it.assetId }.toSet()
+                // TODO: If the amount is huge -> think how to handle
+                val convertedAssetsIds = convertedAssetsRepository.listAll().map { it.assetId }.toSet()
 
-        val skippableAssets = stagedAssetsIds + convertedAssetsIds
+                stagedAssetsIds + convertedAssetsIds
+            }
 
         var assetsFound = 0L
         var assetsQueued = 0L
@@ -106,8 +112,10 @@ class ImmichService(
                         )
                     }
 
+            // Short per-page transaction, so no DB connection is held while paging
+            // through the network.
             QuarkusTransaction.requiringNew().run {
-                assetsToBeStaged.forEach(assetStagingAreaRepository::persist)
+                assetStagingAreaRepository.persist(assetsToBeStaged)
             }
 
             assetsFound += searchAssetsResponse.items.size

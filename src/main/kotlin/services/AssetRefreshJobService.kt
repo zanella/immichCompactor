@@ -1,8 +1,12 @@
 package services
 
 import database.UserId
+import internal.lang.getOrElseException
+import internal.lang.runCatchingSafely
 import jakarta.inject.Singleton
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Runs [ImmichService.findAndEnqueueAllAssets] in a virtual thread so the request thread
@@ -16,10 +20,15 @@ class AssetRefreshJobService(
     enum class State { RUNNING, DONE, FAILED }
 
     data class JobStatus(
+        val threadId: Long,
         val state: State,
+        //
         val assetsFound: Long = 0,
         val assetsQueued: Long = 0,
         val error: String? = null,
+        //
+        val startedAt: Instant = Clock.System.now(),
+        val endedAt: Instant? = null,
     )
 
     // userId -> latest status. One entry per user; overwritten on each new job.
@@ -36,37 +45,44 @@ class AssetRefreshJobService(
         userId: UserId,
         apiKey: String,
         immichServerUrl: String,
-    ): Boolean {
-        var started = false
+    ) {
+        jobs[userId].also { lastKnownJob ->
+            if (lastKnownJob == null) {
+                return@also
+            }
 
-        jobs.compute(userId) { _, current ->
-            if (current?.state == State.RUNNING) {
-                current
-            } else {
-                started = true
-                JobStatus(State.RUNNING)
+            if (lastKnownJob.state == State.DONE) {
+                jobs.remove(userId)
             }
         }
 
-        if (started) {
-            Thread.startVirtualThread { runRefresh(userId, apiKey, immichServerUrl) }
-        }
+        jobs.getOrPut(userId) {
+            val t = Thread.ofVirtual().unstarted { runRefresh(userId, apiKey, immichServerUrl) }
 
-        return started
+            JobStatus(threadId = t.threadId(), State.RUNNING, 0).also { t.start() }
+        }
     }
 
     private fun runRefresh(
         userId: UserId,
         apiKey: String,
         immichServerUrl: String,
-    ) {
-        jobs[userId] =
-            try {
+    ) = jobs
+        .getValue(userId)
+        .let { prevJobStatus ->
+            runCatchingSafely {
                 val client = immichService.instantiateClient(immichServerUrl)
-                val result = immichService.findAndEnqueueAllAssets(apiKey, userId, client)
-                JobStatus(State.DONE, result.assetsFound, result.assetsQueued)
-            } catch (e: Throwable) {
-                JobStatus(State.FAILED, error = e.message ?: e.toString())
+
+                immichService.findAndEnqueueAllAssets(apiKey, userId, client).let {
+                    prevJobStatus.copy(
+                        state = State.DONE,
+                        assetsFound = it.assetsFound,
+                        assetsQueued = it.assetsQueued,
+                    )
+                }
+            }.getOrElseException { e: Exception ->
+                prevJobStatus.copy(state = State.FAILED, error = e.message ?: e.toString())
             }
-    }
+        }.copy(endedAt = Clock.System.now())
+        .also { jobs[userId] = it }
 }
