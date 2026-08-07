@@ -1,13 +1,11 @@
 package services
 
 import database.UserId
-import jakarta.annotation.PreDestroy
 import jakarta.inject.Singleton
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 
 /**
- * Runs [ImmichService.findAndEnqueueAllAssets] in the background so the request thread
+ * Runs [ImmichService.findAndEnqueueAllAssets] in a virtual thread so the request thread
  * returns immediately, and exposes a pollable per-user status. At most one job runs per
  * user at a time.
  */
@@ -15,7 +13,7 @@ import java.util.concurrent.Executors
 class AssetRefreshJobService(
     private val immichService: ImmichService,
 ) {
-    enum class State { IDLE, RUNNING, DONE, FAILED }
+    enum class State { RUNNING, DONE, FAILED }
 
     data class JobStatus(
         val state: State,
@@ -24,16 +22,14 @@ class AssetRefreshJobService(
         val error: String? = null,
     )
 
-    private val executor = Executors.newFixedThreadPool(2)
-
-    // userId -> latest status. ConcurrentHashMap so start()/status() are safe across threads.
+    // userId -> latest status. One entry per user; overwritten on each new job.
     private val jobs = ConcurrentHashMap<UserId, JobStatus>()
 
-    fun status(userId: UserId): JobStatus = jobs[userId] ?: JobStatus(State.IDLE)
+    fun status(userId: UserId): JobStatus? = jobs[userId]
 
     /**
      * Launches a refresh for [userId] unless one is already running; returns true if a new
-     * job was started. The RUNNING flag is flipped atomically so concurrent clicks can't
+     * job was started. The RUNNING flag is checked atomically so concurrent calls can't
      * spawn duplicate jobs.
      */
     fun start(
@@ -53,7 +49,7 @@ class AssetRefreshJobService(
         }
 
         if (started) {
-            executor.submit { runRefresh(userId, apiKey, immichServerUrl) }
+            Thread.startVirtualThread { runRefresh(userId, apiKey, immichServerUrl) }
         }
 
         return started
@@ -72,10 +68,5 @@ class AssetRefreshJobService(
             } catch (e: Throwable) {
                 JobStatus(State.FAILED, error = e.message ?: e.toString())
             }
-    }
-
-    @PreDestroy
-    fun shutdown() {
-        executor.shutdownNow()
     }
 }

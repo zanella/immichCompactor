@@ -3,6 +3,9 @@
 /sandbox/library
 /sandbox/postgres
 .idea
+qwenClaude.sh
+.claude/
+CLAUDE.md
 
 .gradle
 node_modules

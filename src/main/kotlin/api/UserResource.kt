@@ -147,15 +147,15 @@ class UserResource(
 
     private fun assetsRefreshStatusFragment(
         id: UserId,
-        status: AssetRefreshJobService.JobStatus,
+        status: AssetRefreshJobService.JobStatus?,
     ): TemplateInstance =
         assetsStatus
             .instance()
             .data("id", id.value)
-            .data("running", status.state == AssetRefreshJobService.State.RUNNING)
-            .data("done", status.state == AssetRefreshJobService.State.DONE)
-            .data("failed", status.state == AssetRefreshJobService.State.FAILED)
-            .data("assetsFound", status.assetsFound)
-            .data("assetsQueued", status.assetsQueued)
-            .data("error", status.error)
+            .data("running", status?.state == AssetRefreshJobService.State.RUNNING)
+            .data("done", status?.state == AssetRefreshJobService.State.DONE)
+            .data("failed", status?.state == AssetRefreshJobService.State.FAILED)
+            .data("assetsFound", status?.assetsFound ?: 0)
+            .data("assetsQueued", status?.assetsQueued ?: 0)
+            .data("error", status?.error)
 }
