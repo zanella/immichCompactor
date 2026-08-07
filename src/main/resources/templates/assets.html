@@ -12,6 +12,14 @@
                  hx-get="/users/{id}/assets/status"
                  hx-trigger="load"
                  hx-swap="outerHTML"></div>
+
+            <!-- Queued assets list (loaded via HTMX) -->
+            <div id="assets-list"
+                 hx-get="/users/{id}/assets/queued"
+                 hx-trigger="load"
+                 hx-swap="outerHTML">
+                <div class="mt-6 animate-pulse text-gray-400 text-sm">Loading queued assets…</div>
+            </div>
         </div>
     {/body}
 {/include}

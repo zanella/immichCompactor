@@ -1,5 +1,6 @@
 package api
 
+import database.AssetStagingAreaRepository
 import database.UserId
 import database.UserInfoRepository
 import database.getById
@@ -8,12 +9,14 @@ import io.quarkus.qute.Location
 import io.quarkus.qute.Template
 import io.quarkus.qute.TemplateInstance
 import jakarta.ws.rs.Consumes
+import jakarta.ws.rs.DefaultValue
 import jakarta.ws.rs.FormParam
 import jakarta.ws.rs.GET
 import jakarta.ws.rs.POST
 import jakarta.ws.rs.Path
 import jakarta.ws.rs.PathParam
 import jakarta.ws.rs.Produces
+import jakarta.ws.rs.QueryParam
 import jakarta.ws.rs.core.MediaType
 import services.AssetRefreshJobService
 import services.ImmichService
@@ -21,6 +24,7 @@ import services.ImmichService
 @Path("/")
 class UserResource(
     private val assetRefreshJobService: AssetRefreshJobService,
+    private val assetStagingAreaRepository: AssetStagingAreaRepository,
     private val immichService: ImmichService,
     private val userInfoRepository: UserInfoRepository,
     //
@@ -38,6 +42,9 @@ class UserResource(
     //
     @param:Location("assets_status.html")
     private val assetsStatus: Template,
+    //
+    @param:Location("assets_list.html")
+    private val assetsList: Template,
 ) {
     @GET
     @Produces(MediaType.TEXT_HTML)
@@ -87,6 +94,38 @@ class UserResource(
         }
 
         return assetsRefreshStatusFragment(id, assetRefreshJobService.status(id))
+    }
+
+    @GET
+    @Path("/users/{id}/assets/queued")
+    @Produces(MediaType.TEXT_HTML)
+    fun queuedAssets(
+        @PathParam("id") id: UserId,
+        @QueryParam("page") @DefaultValue("1") page: Int,
+        @QueryParam("size") @DefaultValue("50") size: Int,
+    ): TemplateInstance {
+        val safePage = page.coerceAtLeast(1)
+        val safeSize = size.coerceIn(1, 200)
+        val pageIndex = safePage - 1
+
+        val user = userInfoRepository.getById(id.value)
+        val items = assetStagingAreaRepository.findQueuedByUserId(id, pageIndex, safeSize)
+        val total = assetStagingAreaRepository.countQueuedByUserId(id)
+        val pageCount = ((total + safeSize - 1) / safeSize).toInt().coerceAtLeast(1)
+
+        return assetsList
+            .instance()
+            .data("id", id.value)
+            .data("immichServerUrl", user.immichServerUrl.trimEnd('/'))
+            .data("assets", items)
+            .data("page", safePage)
+            .data("size", safeSize)
+            .data("total", total)
+            .data("pageCount", pageCount)
+            .data("hasPrev", safePage > 1)
+            .data("hasNext", safePage < pageCount)
+            .data("prevPage", (safePage - 1).coerceAtLeast(1))
+            .data("nextPage", (safePage + 1).coerceAtMost(pageCount))
     }
 
     @POST

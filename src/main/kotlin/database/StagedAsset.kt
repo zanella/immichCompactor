@@ -37,4 +37,17 @@ class AssetStagingAreaRepository : PanacheRepositoryBase<StagedAsset, UUID> {
 
     @Transactional
     fun getAll(): List<StagedAsset> = listAll()
+
+    @Transactional
+    fun findQueuedByUserId(
+        userId: UserId,
+        pageIndex: Int,
+        pageSize: Int,
+    ): List<StagedAsset> =
+        find("userId = ?1 and currentState = ?2", userId, AssetConversionStates.QUEUED)
+            .page(pageIndex, pageSize)
+            .list()
+
+    @Transactional
+    fun countQueuedByUserId(userId: UserId): Long = count("userId = ?1 and currentState = ?2", userId, AssetConversionStates.QUEUED)
 }
