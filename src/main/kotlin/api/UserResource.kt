@@ -18,11 +18,14 @@ import jakarta.ws.rs.PathParam
 import jakarta.ws.rs.Produces
 import jakarta.ws.rs.QueryParam
 import jakarta.ws.rs.core.MediaType
+import services.AssetConversionService
 import services.AssetRefreshJobService
 import services.ImmichService
+import java.util.UUID
 
 @Path("/")
 class UserResource(
+    private val assetConversionService: AssetConversionService,
     private val assetRefreshJobService: AssetRefreshJobService,
     private val assetStagingAreaRepository: AssetStagingAreaRepository,
     private val immichService: ImmichService,
@@ -126,6 +129,24 @@ class UserResource(
             .data("hasNext", safePage < pageCount)
             .data("prevPage", (safePage - 1).coerceAtLeast(1))
             .data("nextPage", (safePage + 1).coerceAtMost(pageCount))
+    }
+
+    @POST
+    @Path("/users/{id}/assets/{assetId}/convert")
+    @Produces(MediaType.TEXT_HTML)
+    fun convertAsset(
+        @PathParam("id") id: UserId,
+        @PathParam("assetId") assetId: UUID,
+    ): String {
+        val user = userInfoRepository.getById(id.value)
+        val client = immichService.instantiateClient(user.immichServerUrl)
+
+        return try {
+            assetConversionService.processQueuedAssets(client, user, listOf(assetId))
+            "" // success — HTMX will remove the row
+        } catch (e: Exception) {
+            "<tr><td colspan=\"4\" class=\"py-2 px-3 text-red-600 text-xs\">Conversion failed: ${e.message}</td></tr>"
+        }
     }
 
     @POST

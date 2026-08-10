@@ -5,14 +5,23 @@ import database.AssetStagingAreaRepository
 import database.ConvertedAssetsRepository
 import database.StagedAsset
 import database.UserId
+import integration.immich.AssetMediaResponseDto
+import integration.immich.AssetResponseDto
 import integration.immich.ImmichClient
 import integration.immich.SearchAssetsRequest
 import integration.immich.SearchAssetsResponse
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.ws.rs.core.MediaType
 import org.eclipse.microprofile.rest.client.RestClientBuilder
+import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
+import java.io.File
+import java.io.InputStream
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.Instant
+import java.util.UUID
 
 @ApplicationScoped
 class ImmichService(
@@ -127,9 +136,10 @@ class ImmichService(
         return FindAndEnqueueAllAssetsResponse(assetsFound = assetsFound, assetsQueued = assetsQueued)
     }
 
-    /* fun downloadAssetToDisk(
+    fun downloadAssetToDisk(
         apiKey: String,
         assetId: UUID,
+        client: ImmichClient,
         targetOutputFile: File,
     ): Pair<MediaType, HandledContentType> {
         // 1. Fire the request and obtain the network socket reference
@@ -160,6 +170,7 @@ class ImmichService(
     fun uploadLocalFile(
         apiKey: String,
         assetResponse: AssetResponseDto,
+        client: ImmichClient,
         fileToUpload: File,
         mediaType: MediaType,
     ): AssetMediaResponseDto =
@@ -172,7 +183,7 @@ class ImmichService(
                 .attribute("deviceAssetId", "${fileToUpload.name}-${assetResponse.fileCreatedAt}", "")
                 .attribute("fileCreatedAt", assetResponse.fileCreatedAt, "")
                 .attribute("fileModifiedAt", assetResponse.fileModifiedAt, ""),
-        ) */
+        )
 
     // /////////////////////////////////////////////////////////////////////////
 
