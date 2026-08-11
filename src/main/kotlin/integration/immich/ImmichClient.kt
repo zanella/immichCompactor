@@ -45,10 +45,6 @@ interface ImmichClient {
         requestBody: SearchAssetsRequest,
     ): SearchAssetsResponse
 
-    companion object {
-        const val X_API_KEY = "x-api-key"
-    }
-
     // /////////////////////////////////////////////////////////////////////////
 
     @GET
@@ -79,7 +75,7 @@ interface ImmichClient {
     fun getAssetInfo(
         @HeaderParam(X_API_KEY) apiKey: String,
         @PathParam("id") assetId: UUID,
-    ): AssetResponseDto
+    ): Response
 
     @DELETE
     @Path("/assets")
@@ -87,7 +83,53 @@ interface ImmichClient {
         @HeaderParam(X_API_KEY) apiKey: String,
         requestBody: DeleteAssetsRequest,
     )
+
+    @GET
+    @Path("/assets/statistics")
+    fun getAssetStatistics(
+        @HeaderParam(X_API_KEY) apiKey: String,
+    ): AssetsStatisticsResponse
+
+    // /////////////////////////////////////////////////////////////////////////
+
+    @GET
+    @Path("/tags")
+    fun getTags(
+        @HeaderParam(X_API_KEY) apiKey: String,
+    ): List<TagResponseDto>
+
+    /* @PUT
+    @Path("/tags")
+    fun upsertTags(@HeaderParam(X_API_KEY) apiKey: String) */
+
+    @POST
+    @Path("/tags")
+    fun createTag(
+        @HeaderParam(X_API_KEY) apiKey: String,
+        requestBody: CreateTagRequest,
+    ): TagResponseDto
+
+    @PUT
+    @Path("/tags/assets")
+    fun bulkTagAssets(
+        @HeaderParam(X_API_KEY) apiKey: String,
+        requestBody: BulkTagAssetsDto,
+    ): BulkTagAssetsResponse
+
+    // /////////////////////////////////////////////////////////////////////////
+
+    @GET
+    @Path("/server/about")
+    fun serverAbout(
+        @HeaderParam(X_API_KEY) apiKey: String,
+    ): ServerAboutDto
+
+    companion object {
+        const val X_API_KEY = "x-api-key"
+    }
 }
+
+const val IMMICH_COMPACTOR_TAG_NAME = "ModifiedByImmichCompactor"
 
 // /////////////////////////////////////
 

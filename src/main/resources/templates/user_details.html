@@ -5,6 +5,25 @@
         <div class="bg-white p-8 rounded-lg shadow-sm border border-gray-100">
             <a href="/" class="text-indigo-600 hover:underline text-sm">&larr; Back to users</a>
 
+            <div class="mt-4 mb-6 text-sm space-y-2">
+                <div>
+                    <span class="text-gray-500">Immich server version:</span>
+                    {#if serverVersion}
+                        <span class="ml-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-semibold rounded">{serverVersion}</span>
+                    {#else}
+                        <span class="ml-1 px-2 py-0.5 bg-gray-100 text-gray-500 font-mono rounded">unavailable</span>
+                    {/if}
+                </div>
+                <div>
+                    <span class="text-gray-500">Immich Compactor tag ID:</span>
+                    {#if tagId}
+                        <span class="ml-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-semibold rounded">{tagId}</span>
+                    {#else}
+                        <span class="ml-1 px-2 py-0.5 bg-gray-100 text-gray-500 font-mono rounded">unavailable</span>
+                    {/if}
+                </div>
+            </div>
+
             {#include user_form.html /}
         </div>
     {/body}

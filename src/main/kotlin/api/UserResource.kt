@@ -2,6 +2,7 @@ package api
 
 import database.AssetStagingAreaRepository
 import database.UserId
+import database.UserInfo
 import database.UserInfoRepository
 import database.getById
 import io.quarkus.narayana.jta.QuarkusTransaction
@@ -23,6 +24,7 @@ import services.AssetRefreshJobService
 import services.ImmichService
 import java.util.UUID
 
+// TODO: clean it up :-), move logic to service
 @Path("/")
 class UserResource(
     private val assetConversionService: AssetConversionService,
@@ -40,6 +42,9 @@ class UserResource(
     @param:Location("user_form.html")
     private val userForm: Template,
     //
+    @param:Location("user_add.html")
+    private val userAdd: Template,
+    //
     @param:Location("assets.html")
     private val assets: Template,
     //
@@ -51,20 +56,114 @@ class UserResource(
 ) {
     @GET
     @Produces(MediaType.TEXT_HTML)
-    fun index(): TemplateInstance =
+    fun users(): TemplateInstance =
         users
             .instance()
             .data("users", userInfoRepository.listAll())
 
     @GET
+    @Path("/users/new")
+    @Produces(MediaType.TEXT_HTML)
+    fun addUserForm(): TemplateInstance = userFormData(userAdd.instance(), id = null, name = "", immichServerUrl = "", apiKey = "")
+
+    @POST
+    @Path("/users")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Produces(MediaType.TEXT_HTML)
+    fun createUser(
+        @FormParam("name") name: String,
+        @FormParam("immichServerUrl") immichServerUrl: String,
+        @FormParam("apiKey") apiKey: String,
+    ): TemplateInstance = saveUser(id = null, name = name, immichServerUrl = immichServerUrl, apiKey = apiKey)
+
+    @GET
     @Path("/users/{id}")
     @Produces(MediaType.TEXT_HTML)
-    fun user(
+    fun userDetails(
         @PathParam("id") id: UserId,
     ): TemplateInstance =
-        userInfoRepository.getById(id.value).let {
-            userData(userDetails.instance(), id, it.name, it.immichServerUrl, it.apiKey)
+        userInfoRepository.getById(id.value).let { user ->
+            // TODO: check it's >= 2
+            val client = immichService.instantiateClient(user.immichServerUrl)
+
+            val serverVersion =
+                runCatching {
+                    client.serverAbout(user.apiKey).version
+                }.getOrNull()
+
+            val tagId =
+                runCatching {
+                    immichService.upsertTag(user.apiKey, client).id
+                }.getOrNull()
+
+            userFormData(userDetails.instance(), id, user.name, user.immichServerUrl, user.apiKey)
+                .data("serverVersion", serverVersion)
+                .data("tagId", tagId)
         }
+
+    @POST
+    @Path("/users/{id}")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Produces(MediaType.TEXT_HTML)
+    fun updateUser(
+        @PathParam("id") id: UserId,
+        @FormParam("name") name: String,
+        @FormParam("immichServerUrl") immichServerUrl: String,
+        @FormParam("apiKey") apiKey: String,
+    ): TemplateInstance = saveUser(id, name, immichServerUrl, apiKey)
+
+    /** TODO: move to service
+     * Shared create/update flow: [id] == null means "create a new entry", otherwise the
+     * existing entry is updated. Same validation either way.
+     */
+    private fun saveUser(
+        id: UserId?,
+        name: String,
+        immichServerUrl: String,
+        apiKey: String,
+    ): TemplateInstance {
+        if (name.isBlank() || immichServerUrl.isBlank() || apiKey.isBlank()) {
+            return userFormData(
+                userForm.instance(),
+                id,
+                name,
+                immichServerUrl,
+                apiKey,
+                error = "All fields are required.",
+            )
+        }
+
+        // Validate the supplied API key against the supplied server, before touching the DB.
+        if (!apiKeyIsValid(immichServerUrl, apiKey)) {
+            return userFormData(
+                userForm.instance(),
+                id,
+                name,
+                immichServerUrl,
+                apiKey,
+                error = "Immich rejected this API key — the user was not saved.",
+            )
+        }
+
+        immichService.upsertTag(apiKey, immichService.instantiateClient(immichServerUrl))
+
+        // Only now open a transaction to persist the change (flushed on commit).
+        QuarkusTransaction.requiringNew().run {
+            if (id == null) {
+                userInfoRepository.persist(
+                    UserInfo(apiKey = apiKey, name = name, immichServerUrl = immichServerUrl),
+                )
+            } else {
+                userInfoRepository.getById(id.value).also {
+                    it.name = name
+                    it.immichServerUrl = immichServerUrl
+                    it.apiKey = apiKey
+                }
+            }
+        }
+
+        return userFormData(userForm.instance(), id, name, immichServerUrl, apiKey, saved = true)
+    }
 
     @GET
     @Path("/users/{id}/assets")
@@ -139,58 +238,41 @@ class UserResource(
         @PathParam("assetId") assetId: UUID,
     ): String {
         val user = userInfoRepository.getById(id.value)
+
         val client = immichService.instantiateClient(user.immichServerUrl)
 
         return try {
             assetConversionService.processQueuedAssets(client, user, listOf(assetId))
-            "" // success — HTMX will remove the row
+
+            // Success — return the row in a disabled state
+            """
+            <tr class="border-b border-gray-100 opacity-40 pointer-events-none select-none">
+                <td class="py-2 px-3 text-gray-400 text-xs"></td>
+                <td class="py-2 px-3 font-mono text-xs text-gray-400 line-through">$assetId</td>
+                <td class="py-2 px-3">
+                    <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Converted</span>
+                </td>
+                <td class="py-2 px-3 text-right"></td>
+            </tr>
+            """.trim()
         } catch (e: Exception) {
+            println(e.stackTraceToString())
+
             "<tr><td colspan=\"4\" class=\"py-2 px-3 text-red-600 text-xs\">Conversion failed: ${e.message}</td></tr>"
         }
     }
 
-    @POST
-    @Path("/users/{id}")
-    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-    @Produces(MediaType.TEXT_HTML)
-    fun updateUser(
-        @PathParam("id") id: UserId,
-        @FormParam("name") name: String,
-        @FormParam("immichServerUrl") immichServerUrl: String,
-        @FormParam("apiKey") apiKey: String,
-    ): TemplateInstance {
-        // Validate the supplied API key against the supplied server, before touching the DB.
-        val valid =
-            runCatching {
-                immichService.instantiateClient(immichServerUrl).authValidateToken(apiKey).authStatus
-            }.getOrDefault(false)
+    private fun apiKeyIsValid(
+        immichServerUrl: String,
+        apiKey: String,
+    ): Boolean =
+        runCatching {
+            immichService.instantiateClient(immichServerUrl).authValidateToken(apiKey).authStatus
+        }.getOrDefault(false)
 
-        if (!valid) {
-            return userData(
-                userForm.instance(),
-                id,
-                name,
-                immichServerUrl,
-                apiKey,
-                error = "Immich rejected this API key — changes were not saved.",
-            )
-        }
-
-        // Only now open a transaction to persist the edit (flushed on commit).
-        QuarkusTransaction.requiringNew().run {
-            userInfoRepository.getById(id.value).also {
-                it.name = name
-                it.immichServerUrl = immichServerUrl
-                it.apiKey = apiKey
-            }
-        }
-
-        return userData(userForm.instance(), id, name, immichServerUrl, apiKey, saved = true)
-    }
-
-    private fun userData(
+    private fun userFormData(
         instance: TemplateInstance,
-        id: UserId,
+        id: UserId?,
         name: String,
         immichServerUrl: String,
         apiKey: String,
@@ -198,7 +280,8 @@ class UserResource(
         error: String? = null,
     ): TemplateInstance =
         instance
-            .data("id", id.value)
+            .data("id", id?.value)
+            .data("formAction", if (id == null) "/users" else "/users/${id.value}")
             .data("name", name)
             .data("immichServerUrl", immichServerUrl)
             .data("apiKey", apiKey)

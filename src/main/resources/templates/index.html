@@ -4,11 +4,10 @@
     {#body}
         <div class="bg-white p-8 rounded-lg shadow-sm border border-gray-100">
 
-            <!-- TODO: userAdd page -->
-
-            <button class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors">
-                Get Started
-            </button>
+            <a href="/users/new"
+               class="inline-block mb-4 px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors">
+                Add User
+            </a>
 
             {#for user in users}
                 <div class="flex items-center gap-4 py-2 border-b border-gray-100">

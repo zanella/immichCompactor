@@ -8,9 +8,11 @@ import database.ConvertedAssetsRepository
 import database.UserId
 import database.UserInfo
 import integration.immich.AssetMediaStatus
+import integration.immich.BulkTagAssetsDto
 import integration.immich.CopyAssetRequest
 import integration.immich.DeleteAssetsRequest
 import integration.immich.ImmichClient
+import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import services.HandledContentType.IMAGE_JPEG
 import services.HandledContentType.IMAGE_PNG
@@ -26,7 +28,7 @@ class AssetConversionService(
     private val convertedAssetsRepository: ConvertedAssetsRepository,
     private val immichService: ImmichService,
 ) {
-    /**
+    /** TODO:
      * fun processQueuedAssets(
      *         client: ImmichClient,
      *         userInfo: UserInfo
@@ -38,6 +40,8 @@ class AssetConversionService(
         userInfo: UserInfo,
         queuedAssetsIds: List<UUID>,
     ) {
+        val tagId = immichService.upsertTag(userInfo.apiKey, client).id
+
         val tmpDir =
             Files
                 .createTempDirectory("immich-upload-")
@@ -48,11 +52,12 @@ class AssetConversionService(
             // TODO: what if the ID is not found ?
             .mapNotNull(assetStagingAreaRepository::findById)
             .forEach { stagedAsset ->
-                // assetStagingAreaRepository.getAll().forEach { stagedAsset ->
-                val assetInfo = client.getAssetInfo(userInfo.apiKey, stagedAsset.assetId)
+                val assetInfo = immichService.getAssetInfo(userInfo.apiKey, stagedAsset.assetId, client)
 
-                if (assetInfo.isTrashed) {
-                    assetStagingAreaRepository.deleteById(stagedAsset.assetId)
+                if ((assetInfo == null) || assetInfo.isTrashed) {
+                    QuarkusTransaction.requiringNew().run {
+                        assetStagingAreaRepository.deleteById(stagedAsset.assetId)
+                    }
 
                     return@forEach
                 }
@@ -123,6 +128,16 @@ class AssetConversionService(
 
                 // TODO: https://api.immich.app/endpoints/tags/bulkTagAssets
                 // Tag the assets that have been converted
+
+                client
+                    .bulkTagAssets(
+                        userInfo.apiKey,
+                        BulkTagAssetsDto(assetIds = listOf(uploadResponse.id), tagIds = listOf(tagId)),
+                    ).also {
+                        require(it.count == 1) {
+                            "Immich didn't tag the new asset ${uploadResponse.id}"
+                        }
+                    }
 
                 stagedAsset.currentState = AssetConversionStates.OBSOLETE
                 replacementEntity.currentState = ConvertedAssetStates.COMPLETE

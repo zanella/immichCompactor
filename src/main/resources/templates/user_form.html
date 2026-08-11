@@ -1,9 +1,9 @@
 <div id="user-form">
-    <h2 class="text-3xl font-extrabold text-indigo-600 mt-4 mb-6">{name}</h2>
+    <h2 class="text-3xl font-extrabold text-indigo-600 mt-4 mb-6">{#if id}{name}{#else}Add user{/if}</h2>
 
     {#if saved}
         <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm">
-            Saved.
+            {#if id}Saved.{#else}User created. <a href="/" class="underline font-semibold">Back to users</a>{/if}
         </div>
     {/if}
     {#if error}
@@ -12,7 +12,7 @@
         </div>
     {/if}
 
-    <form hx-post="/users/{id}" hx-target="#user-form" hx-swap="outerHTML" class="space-y-4">
+    <form hx-post="{formAction}" hx-target="#user-form" hx-swap="outerHTML" class="space-y-4">
         <div>
             <label for="name" class="block text-sm font-semibold text-gray-500 mb-1">User Name</label>
             <input id="name" name="name" type="text" value="{name}"
@@ -31,7 +31,7 @@
 
         <button type="submit"
                 class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors">
-            Save changes
+            {#if id}Save changes{#else}Create user{/if}
         </button>
     </form>
 </div>

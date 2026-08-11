@@ -57,5 +57,6 @@ data class AssetResponseDto(
     val originalFileName: String,
     val originalPath: String? = null,
     val ownerId: UUID,
+    val tags: List<TagResponseDto> = emptyList(),
     val width: Int? = null,
 )

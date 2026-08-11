@@ -67,22 +67,23 @@ class AssetRefreshJobService(
         userId: UserId,
         apiKey: String,
         immichServerUrl: String,
-    ) = jobs
-        .getValue(userId)
-        .let { prevJobStatus ->
-            runCatchingSafely {
-                val client = immichService.instantiateClient(immichServerUrl)
+    ): JobStatus =
+        jobs
+            .getValue(userId)
+            .let { prevJobStatus ->
+                runCatchingSafely {
+                    val client = immichService.instantiateClient(immichServerUrl)
 
-                immichService.findAndEnqueueAllAssets(apiKey, userId, client).let {
-                    prevJobStatus.copy(
-                        state = State.DONE,
-                        assetsFound = it.assetsFound,
-                        assetsQueued = it.assetsQueued,
-                    )
+                    immichService.findAndEnqueueAllAssets(apiKey, userId, client).let {
+                        prevJobStatus.copy(
+                            state = State.DONE,
+                            assetsFound = it.assetsFound,
+                            assetsQueued = it.assetsQueued,
+                        )
+                    }
+                }.getOrElseException { e: Exception ->
+                    prevJobStatus.copy(state = State.FAILED, error = e.message ?: e.toString())
                 }
-            }.getOrElseException { e: Exception ->
-                prevJobStatus.copy(state = State.FAILED, error = e.message ?: e.toString())
-            }
-        }.copy(endedAt = Clock.System.now())
-        .also { jobs[userId] = it }
+            }.copy(endedAt = Clock.System.now())
+            .also { jobs[userId] = it }
 }

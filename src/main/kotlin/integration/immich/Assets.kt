@@ -32,6 +32,15 @@ data class CopyAssetRequest(
 // ///////////////////
 
 @Serializable
+data class AssetsStatisticsResponse(
+    val images: Long,
+    val total: Long,
+    val videos: Long,
+)
+
+// ///////////////////
+
+@Serializable
 data class DeleteAssetsRequest(
     val ids: List<UUID>, // List of Asset UUIDs to delete
     val force: Boolean, // Force delete even if in use (e.g., inside an album)

@@ -7,9 +7,12 @@ import database.StagedAsset
 import database.UserId
 import integration.immich.AssetMediaResponseDto
 import integration.immich.AssetResponseDto
+import integration.immich.CreateTagRequest
+import integration.immich.IMMICH_COMPACTOR_TAG_NAME
 import integration.immich.ImmichClient
 import integration.immich.SearchAssetsRequest
 import integration.immich.SearchAssetsResponse
+import integration.immich.TagResponseDto
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.MediaType
@@ -38,6 +41,7 @@ class ImmichService(
         RestClientBuilder
             .newBuilder()
             .baseUri(URI.create(baseUrl))
+            .property("microprofile.rest.client.disable.default.mapper", true)
             .also {
                 if (isDebug) {
                     // 1. Enable built-in network logging scope
@@ -47,6 +51,25 @@ class ImmichService(
                     // .register(ImmichLoggingFilter::class.java)
                 }
             }.build(ImmichClient::class.java)
+
+    fun getAssetInfo(
+        apiKey: String,
+        assetId: UUID,
+        client: ImmichClient,
+    ): AssetResponseDto? {
+        val response = client.getAssetInfo(apiKey, assetId)
+
+        println("Get Asset Info: $response")
+
+        // TODO: Immich returns 400, instead of 404, if the asset is not found...
+        if (response.status == 400) {
+            return null
+        } else if (response.status != 200) {
+            throw RuntimeException("Download failed with HTTP Status: ${response.status}")
+        }
+
+        return response.entity as? AssetResponseDto
+    }
 
     fun findAllAssets(
         apiKey: String,
@@ -111,7 +134,17 @@ class ImmichService(
 
             val assetsToBeStaged =
                 searchAssetsResponse.items
-                    .filter { !skippableAssets.contains(it.id) }
+                    .filter {
+                        if (it.tags.isNotEmpty()) {
+                            println("Found ${it.tags} tags")
+                        }
+
+                        // If not tagged by immichCompactor -> not converted by it :-)
+                        it.tags
+                            .filter { tag -> tag.name == IMMICH_COMPACTOR_TAG_NAME }
+                            .toSet()
+                            .isEmpty()
+                    }.filter { !skippableAssets.contains(it.id) }
                     .filter { !it.isTrashed }
                     .map { asset ->
                         StagedAsset(
@@ -184,6 +217,21 @@ class ImmichService(
                 .attribute("fileCreatedAt", assetResponse.fileCreatedAt, "")
                 .attribute("fileModifiedAt", assetResponse.fileModifiedAt, ""),
         )
+
+    // /////////////////////////////////////////////////////////////////////////
+
+    fun upsertTag(
+        apiKey: String,
+        client: ImmichClient,
+    ): TagResponseDto =
+        client
+            .getTags(apiKey)
+            .singleOrNull { it.name == IMMICH_COMPACTOR_TAG_NAME }
+            ?: client
+                .createTag(
+                    apiKey,
+                    CreateTagRequest(name = IMMICH_COMPACTOR_TAG_NAME),
+                )
 
     // /////////////////////////////////////////////////////////////////////////
 
