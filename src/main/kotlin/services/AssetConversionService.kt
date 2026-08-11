@@ -8,7 +8,6 @@ import database.ConvertedAssetsRepository
 import database.UserId
 import database.UserInfo
 import integration.immich.AssetMediaStatus
-import integration.immich.BulkTagAssetsDto
 import integration.immich.CopyAssetRequest
 import integration.immich.DeleteAssetsRequest
 import integration.immich.ImmichClient
@@ -40,7 +39,7 @@ class AssetConversionService(
         userInfo: UserInfo,
         queuedAssetsIds: List<UUID>,
     ) {
-        val tagId = immichService.upsertTag(userInfo.apiKey, client).id
+        // val tagId = immichService.upsertTag(userInfo.apiKey, client).id
 
         val tmpDir =
             Files
@@ -126,18 +125,13 @@ class AssetConversionService(
                     ),
                 )
 
-                // TODO: https://api.immich.app/endpoints/tags/bulkTagAssets
-                // Tag the assets that have been converted
-
-                client
-                    .bulkTagAssets(
+                /*  TODO: Tag the assets that have been converted
+                client.bulkTagAssets(
                         userInfo.apiKey,
                         BulkTagAssetsDto(assetIds = listOf(uploadResponse.id), tagIds = listOf(tagId)),
                     ).also {
-                        require(it.count == 1) {
-                            "Immich didn't tag the new asset ${uploadResponse.id}"
-                        }
-                    }
+                        require(it.count == 1) { "Immich didn't tag the new asset ${uploadResponse.id}" }
+                    } */
 
                 stagedAsset.currentState = AssetConversionStates.OBSOLETE
                 replacementEntity.currentState = ConvertedAssetStates.COMPLETE

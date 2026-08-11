@@ -7,12 +7,10 @@ import database.StagedAsset
 import database.UserId
 import integration.immich.AssetMediaResponseDto
 import integration.immich.AssetResponseDto
-import integration.immich.CreateTagRequest
-import integration.immich.IMMICH_COMPACTOR_TAG_NAME
 import integration.immich.ImmichClient
+import integration.immich.ImmichLoggingFilter
 import integration.immich.SearchAssetsRequest
 import integration.immich.SearchAssetsResponse
-import integration.immich.TagResponseDto
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.MediaType
@@ -48,7 +46,7 @@ class ImmichService(
                     it.property("quarkus.rest-client.logging.scope", "request-response")
                     // 2. Set max body log limits in characters
                     it.property("quarkus.rest-client.logging.body-limit", "50000")
-                    // .register(ImmichLoggingFilter::class.java)
+                    it.register(ImmichLoggingFilter::class.java)
                 }
             }.build(ImmichClient::class.java)
 
@@ -58,8 +56,6 @@ class ImmichService(
         client: ImmichClient,
     ): AssetResponseDto? {
         val response = client.getAssetInfo(apiKey, assetId)
-
-        println("Get Asset Info: $response")
 
         // TODO: Immich returns 400, instead of 404, if the asset is not found...
         if (response.status == 400) {
@@ -134,7 +130,7 @@ class ImmichService(
 
             val assetsToBeStaged =
                 searchAssetsResponse.items
-                    .filter {
+                    /* TODO: Immich doesn't return tags .filter {
                         if (it.tags.isNotEmpty()) {
                             println("Found ${it.tags} tags")
                         }
@@ -144,7 +140,8 @@ class ImmichService(
                             .filter { tag -> tag.name == IMMICH_COMPACTOR_TAG_NAME }
                             .toSet()
                             .isEmpty()
-                    }.filter { !skippableAssets.contains(it.id) }
+                    }*/
+                    .filter { !skippableAssets.contains(it.id) }
                     .filter { !it.isTrashed }
                     .map { asset ->
                         StagedAsset(
@@ -220,6 +217,7 @@ class ImmichService(
 
     // /////////////////////////////////////////////////////////////////////////
 
+    /* TODO: Immich doesn't return tags on the search/metadata endpoint :-/
     fun upsertTag(
         apiKey: String,
         client: ImmichClient,
@@ -231,7 +229,7 @@ class ImmichService(
                 .createTag(
                     apiKey,
                     CreateTagRequest(name = IMMICH_COMPACTOR_TAG_NAME),
-                )
+                ) */
 
     // /////////////////////////////////////////////////////////////////////////
 
