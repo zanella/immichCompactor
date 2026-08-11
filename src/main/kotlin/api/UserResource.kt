@@ -242,19 +242,46 @@ class UserResource(
         val client = immichService.instantiateClient(user.immichServerUrl)
 
         return try {
-            assetConversionService.processQueuedAssets(client, user, listOf(assetId))
+            val newAssetId = assetConversionService.processQueuedAsset(client, user, assetId)
 
-            // Success — return the row in a disabled state
-            """
-            <tr class="border-b border-gray-100 opacity-40 pointer-events-none select-none">
-                <td class="py-2 px-3 text-gray-400 text-xs"></td>
-                <td class="py-2 px-3 font-mono text-xs text-gray-400 line-through">$assetId</td>
-                <td class="py-2 px-3">
-                    <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Converted</span>
-                </td>
-                <td class="py-2 px-3 text-right"></td>
-            </tr>
-            """.trim()
+            println("newAssetId: $newAssetId")
+
+            if (newAssetId == null) {
+                // Trashed or not found — it was removed from the queue, nothing to link to.
+                """
+                <tr class="border-b border-gray-100 opacity-40 pointer-events-none select-none">
+                    <td class="py-2 px-3 text-gray-400 text-xs"></td>
+                    <td class="py-2 px-3 font-mono text-xs text-gray-400 line-through">$assetId</td>
+                    <td class="py-2 px-3">
+                        <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Removed</span>
+                    </td>
+                    <td class="py-2 px-3 text-right"></td>
+                </tr>
+                """.trim()
+            } else {
+                // Success — row in a disabled state, but with a link to the new asset.
+                val baseUrl = user.immichServerUrl.trimEnd('/')
+
+                // TODO: move to template
+                """
+                <tr class="border-b border-gray-100 opacity-40 select-none">
+                    <td class="py-2 px-3 text-gray-400 text-xs"></td>
+                    <td class="py-2 px-3 font-mono text-xs text-gray-400 line-through">$assetId</td>
+                    <td class="py-2 px-3">
+                        <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Converted</span>
+                    </td>
+                    <td class="py-2 px-3 text-right">
+                        <a href="$baseUrl/photos/$newAssetId"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 transition-colors">
+                            View new
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        </a>
+                    </td>
+                </tr>
+                """.trim()
+            }
         } catch (e: Exception) {
             println(e.stackTraceToString())
 

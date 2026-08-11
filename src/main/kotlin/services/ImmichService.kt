@@ -57,6 +57,8 @@ class ImmichService(
     ): AssetResponseDto? {
         val response = client.getAssetInfo(apiKey, assetId)
 
+        println("response: ${response.status}")
+
         // TODO: Immich returns 400, instead of 404, if the asset is not found...
         if (response.status == 400) {
             return null
@@ -64,7 +66,7 @@ class ImmichService(
             throw RuntimeException("Download failed with HTTP Status: ${response.status}")
         }
 
-        return response.entity as? AssetResponseDto
+        return response.readEntity(AssetResponseDto::class.java)
     }
 
     fun findAllAssets(
@@ -244,18 +246,19 @@ class ImmichService(
                 .substringAfter("/", missingDelimiterValue = "")
 
         return when (subType) {
-            "jpeg", "jpg" -> HandledContentType.IMAGE_JPEG
-            "png" -> HandledContentType.IMAGE_PNG
-            /* "quicktime" -> "mov"
-            "x-matroska" -> "mkv"
-            "octet-stream" -> "bin" */
-            else -> HandledContentType.UNKNOWN
+            "jpeg", "jpg", "png", "pgx", "pam", "pnm", "pgm", "ppm", "pfm", "gif", "exr",
+            -> HandledContentType.IMAGE_TO_JPEG_XL
+            "3gp", "3gpp", "avi", "flv", "m4v", "mkv", "mts", "m2ts", "m2t", "mp4", "insv",
+            "mpg", "mpe", "mpeg", "mov", "webm", "wmv",
+            -> HandledContentType.VIDEO_BY_HANDBRAKE
+            else
+            -> HandledContentType.UNKNOWN
         }
     }
 }
 
 enum class HandledContentType {
     UNKNOWN,
-    IMAGE_JPEG,
-    IMAGE_PNG,
+    IMAGE_TO_JPEG_XL,
+    VIDEO_BY_HANDBRAKE,
 }
