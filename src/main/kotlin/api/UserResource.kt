@@ -91,10 +91,10 @@ class UserResource(
                     client.serverAbout(user.apiKey).version
                 }.getOrNull()
 
-            /* val tagId =
+            val tagId =
                 runCatching {
                     immichService.upsertTag(user.apiKey, client).id
-                }.getOrNull() */
+                }.getOrNull()
 
             userFormData(userDetails.instance(), id, user.name, user.immichServerUrl, user.apiKey)
                 .data("serverVersion", serverVersion)
@@ -145,7 +145,7 @@ class UserResource(
             )
         }
 
-        // immichService.upsertTag(apiKey, immichService.instantiateClient(immichServerUrl))
+        immichService.upsertTag(apiKey, immichService.instantiateClient(immichServerUrl))
 
         // Only now open a transaction to persist the change (flushed on commit).
         QuarkusTransaction.requiringNew().run {

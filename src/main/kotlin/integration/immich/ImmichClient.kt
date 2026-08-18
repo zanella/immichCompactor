@@ -98,9 +98,11 @@ interface ImmichClient {
         @HeaderParam(X_API_KEY) apiKey: String,
     ): List<TagResponseDto>
 
-    /* @PUT
+    @PUT
     @Path("/tags")
-    fun upsertTags(@HeaderParam(X_API_KEY) apiKey: String) */
+    fun upsertTags(
+        @HeaderParam(X_API_KEY) apiKey: String,
+    )
 
     @POST
     @Path("/tags")

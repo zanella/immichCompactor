@@ -7,10 +7,12 @@ import database.ConvertedAssetStates
 import database.ConvertedAssetsRepository
 import database.UserId
 import database.UserInfo
+import database.getById
 import integration.immich.AssetMediaStatus
 import integration.immich.CopyAssetRequest
 import integration.immich.DeleteAssetsRequest
 import integration.immich.ImmichClient
+import internal.lang.runCatchingSafely
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import services.HandledContentType.UNKNOWN
@@ -37,113 +39,136 @@ class AssetConversionService(
         userInfo: UserInfo,
         queuedAssetsId: UUID,
     ): UUID? {
-        // val tagId = immichService.upsertTag(userInfo.apiKey, client).id
+        val deferredListOfFilesToDelete = mutableListOf<File?>()
 
-        val tmpDir =
-            Files
-                .createTempDirectory("immich-upload-")
-                .toFile()
-                .also { it.deleteOnExit() }
+        try {
+            // TODO: what was this tag supposed to do ?
+            val tagId = immichService.upsertTag(userInfo.apiKey, client).id
 
-        val stagedAsset =
-            QuarkusTransaction.joiningExisting().call {
-                assetStagingAreaRepository.findById(queuedAssetsId)
-            } ?: return null
+            val tmpDir =
+                Files
+                    .createTempDirectory("immich-upload-")
+                    .toFile()
+                    .also { it.deleteOnExit() }
 
-        println("stagedAsset: $stagedAsset")
+            val stagedAsset =
+                QuarkusTransaction.joiningExisting().call {
+                    assetStagingAreaRepository.findById(queuedAssetsId)
+                } ?: return null
 
-        val assetInfo = immichService.getAssetInfo(userInfo.apiKey, stagedAsset.assetId, client)
+            println("stagedAsset: $stagedAsset")
 
-        println("assetInfo: $assetInfo")
+            val assetInfo = immichService.getAssetInfo(userInfo.apiKey, stagedAsset.assetId, client)
 
-        if ((assetInfo == null) || assetInfo.isTrashed) {
-            QuarkusTransaction.requiringNew().run { assetStagingAreaRepository.deleteById(stagedAsset.assetId) }
+            println("assetInfo: $assetInfo")
 
-            return null
-        }
+            // TODO: check if asset has tag
 
-        val (_, suffix) = splitFileName(assetInfo.originalFileName).also { require(it.second.isNotBlank()) }
+            if ((assetInfo == null) || assetInfo.isTrashed) {
+                QuarkusTransaction.requiringNew().run { assetStagingAreaRepository.deleteById(stagedAsset.assetId) }
 
-        // Download the asset
-        val downloadFd =
-            File(tmpDir, "originalDownloaded.$suffix")
-                // TODO: move to finally
-                .also { it.deleteOnExit() }
+                return null
+            }
 
-        val (mediaType, fileType) =
-            immichService.downloadAssetToDisk(
-                apiKey = userInfo.apiKey,
-                assetId = assetInfo.id,
-                client = client,
-                targetOutputFile = downloadFd,
-            )
+            val (_, suffix) = splitFileName(assetInfo.originalFileName).also { require(it.second.isNotBlank()) }
 
-        // Convert it
-        val convertedFd =
-            convertAsset(fileType, downloadFd, assetInfo.originalFileName, tmpDir)
-                // TODO: move to finally
-                .also { it.deleteOnExit() }
+            // Download the asset
+            val downloadFd =
+                File(tmpDir, "originalDownloaded.$suffix")
+                    .also(deferredListOfFilesToDelete::add)
 
-        downloadFd.delete()
+            val (mediaType, fileType) =
+                immichService.downloadAssetToDisk(
+                    apiKey = userInfo.apiKey,
+                    assetId = assetInfo.id,
+                    client = client,
+                    targetOutputFile = downloadFd,
+                )
 
-        // Upload the converted asset
-        val uploadResponse =
-            immichService
-                .uploadLocalFile(userInfo.apiKey, assetInfo, client, convertedFd, mediaType)
-                .also {
+            // Convert it
+            val conversionResponse =
+                convertAsset(fileType, downloadFd, assetInfo.originalFileName, tmpDir)
+                    .also { deferredListOfFilesToDelete.add(it.convertedFile) }
+
+            val convertedFd =
+                when (conversionResponse.reason) {
+                    AssetConversionReason.OK -> requireNotNull(conversionResponse.convertedFile)
+                    AssetConversionReason.ORIGINAL_IS_SMALLER -> {
+                        QuarkusTransaction.joiningExisting().call {
+                            assetStagingAreaRepository
+                                .getById(stagedAsset.assetId)
+                                .currentState = AssetConversionStates.KEEP_AS_IS
+                        }
+
+                        return null
+                    }
+                }
+
+            // Upload the converted asset
+            val uploadResponse =
+                immichService
+                    .uploadLocalFile(userInfo.apiKey, assetInfo, client, convertedFd, mediaType)
+                    .also {
                         /*
                          * TODO: If the application dies right after here, it won't be CREATED,
                          *  what to do then ?
                          */
-                    require(it.status == AssetMediaStatus.CREATED) {
-                        "Immich said ${convertedFd.name} is a ${it.status}"
+                        require(it.status == AssetMediaStatus.CREATED) {
+                            "Immich said ${convertedFd.name} is a ${it.status}"
+                        }
                     }
+
+            // Replacement: Save state
+            val replacementEntity =
+                ConvertedAsset(
+                    userId = UserId(userInfo.id),
+                    assetId = uploadResponse.id,
+                    currentState = ConvertedAssetStates.UPLOADED,
+                ).also(convertedAssetsRepository::store)
+
+            // Transfer metadata
+            client.copyAsset(
+                userInfo.apiKey,
+                CopyAssetRequest(
+                    albums = true,
+                    favorite = true,
+                    sharedLinks = true,
+                    sidecar = true,
+                    sourceId = assetInfo.id,
+                    stack = true,
+                    targetId = uploadResponse.id,
+                ),
+            )
+
+            /*  TODO: Tag the assets that have been converted
+                    client.bulkTagAssets(
+                            userInfo.apiKey,
+                            BulkTagAssetsDto(assetIds = listOf(uploadResponse.id), tagIds = listOf(tagId)),
+                        ).also {
+                            require(it.count == 1) { "Immich didn't tag the new asset ${uploadResponse.id}" }
+                        } */
+
+            stagedAsset.currentState = AssetConversionStates.WAITING_DELETION
+            replacementEntity.currentState = ConvertedAssetStates.COMPLETE
+
+            // TODO: receive option to HARD-delete
+
+            // Send original asset to trash
+            client.deleteAssets(
+                userInfo.apiKey,
+                DeleteAssetsRequest(ids = listOf(assetInfo.id), force = false),
+            )
+
+            QuarkusTransaction.joiningExisting().call { assetStagingAreaRepository.dropById(assetInfo.id) }
+
+            return uploadResponse.id
+        } finally {
+            deferredListOfFilesToDelete.filterNotNull().forEach {
+                runCatchingSafely {
+                    it.delete()
                 }
-
-        // Replacement: Save state
-        val replacementEntity =
-            ConvertedAsset(
-                userId = UserId(userInfo.id),
-                assetId = uploadResponse.id,
-                currentState = ConvertedAssetStates.UPLOADED,
-            ).also(convertedAssetsRepository::store)
-
-        convertedFd.delete()
-
-        // Transfer metadata
-        client.copyAsset(
-            userInfo.apiKey,
-            CopyAssetRequest(
-                albums = true,
-                favorite = true,
-                sharedLinks = true,
-                sidecar = true,
-                sourceId = assetInfo.id,
-                stack = true,
-                targetId = uploadResponse.id,
-            ),
-        )
-
-        /*  TODO: Tag the assets that have been converted
-                client.bulkTagAssets(
-                        userInfo.apiKey,
-                        BulkTagAssetsDto(assetIds = listOf(uploadResponse.id), tagIds = listOf(tagId)),
-                    ).also {
-                        require(it.count == 1) { "Immich didn't tag the new asset ${uploadResponse.id}" }
-                    } */
-
-        stagedAsset.currentState = AssetConversionStates.OBSOLETE
-        replacementEntity.currentState = ConvertedAssetStates.COMPLETE
-
-        // Send original asset to trash
-        client.deleteAssets(
-            userInfo.apiKey,
-            DeleteAssetsRequest(ids = listOf(assetInfo.id), force = false),
-        )
-
-        assetStagingAreaRepository.dropById(assetInfo.id)
-
-        return uploadResponse.id
+            }
+        }
     }
 
     fun convertAsset(
@@ -151,20 +176,18 @@ class AssetConversionService(
         input: File,
         originalName: String,
         temporaryDir: File,
-    ): File =
+    ): AssetConversionReturn =
         when (fileType) {
             UNKNOWN -> TODO()
-            HandledContentType.IMAGE_TO_JPEG_XL,
-            -> convertImage(input, originalName, temporaryDir)
-            HandledContentType.VIDEO_BY_HANDBRAKE,
-            -> convertVideo(input, originalName, temporaryDir)
+            HandledContentType.IMAGE_TO_JPEG_XL -> convertImage(input, originalName, temporaryDir)
+            HandledContentType.VIDEO_TO_H265 -> convertVideo(input, originalName, temporaryDir)
         }
 
     fun convertImage(
         input: File,
         originalName: String,
         temporaryDir: File,
-    ): File {
+    ): AssetConversionReturn {
         val convertedFd =
             File(
                 temporaryDir,
@@ -178,7 +201,7 @@ class AssetConversionService(
 
         println("Success: Image converted to JXL.")
 
-        return convertedFd
+        return AssetConversionReturn(convertedFd, AssetConversionReason.OK)
     }
 
     private fun executeCmd(command: String) {
@@ -202,41 +225,32 @@ class AssetConversionService(
         input: File,
         originalName: String,
         temporaryDir: File,
-    ): File {
-        val intermediateFd =
-            File(
-                temporaryDir,
-                splitFileName(originalName).also { require(it.first.isNotBlank()) }.first + "-temp.mp4",
-            )
-
-        //
-        val preset = "\"Fast 720p30\""
-
-        val handBrakeCmd =
-            "HandBrakeCLI  -Z $preset -i '${input.absolutePath}' -o '${intermediateFd.absolutePath}'"
-
-        executeCmd(handBrakeCmd)
-
-        println("Success: Video converted to MP4.")
-
-        //
+    ): AssetConversionReturn {
         val convertedFd =
             File(
                 temporaryDir,
                 splitFileName(originalName).also { require(it.first.isNotBlank()) }.first + ".mp4",
             )
 
-        val ffmpegCmd =
-            "ffmpeg -i '${intermediateFd.absolutePath}' -i '${input.absolutePath}'" +
-                " -map 0 -map_metadata 1 -c copy -y '${convertedFd.absolutePath}'"
+        val handBrakeCmd =
+            """
+           HandBrakeCLI -i '${input.absolutePath}' -o '${convertedFd.absolutePath}' -e x265 -q 22 -r 30 --vfr --encoder-preset medium --all-audio --all-subtitles
+        """.trim()
 
-        executeCmd(ffmpegCmd)
+        executeCmd(handBrakeCmd)
 
-        println("Success: Video's metadata copied.")
+        // If the converted ends up being bigger, use the original
+        return if (input.length() <= convertedFd.length()) {
+            // TODO: this is rather stupid, change it to mark the original as NON-ACTIONABLE
 
-        intermediateFd.delete()
+            println("Original: ${input.length()} | converted: ${convertedFd.length()}")
 
-        return convertedFd
+            convertedFd.delete()
+
+            AssetConversionReturn(null, AssetConversionReason.ORIGINAL_IS_SMALLER)
+        } else {
+            AssetConversionReturn(convertedFd, AssetConversionReason.OK)
+        }
     }
 
     private fun splitFileName(fileName: String): Pair<String, String> =
@@ -246,4 +260,14 @@ class AssetConversionService(
         } else {
             Pair(fileName.substringBeforeLast("."), fileName.substringAfterLast(".").lowercase().trim())
         }
+}
+
+data class AssetConversionReturn(
+    val convertedFile: File?,
+    val reason: AssetConversionReason,
+)
+
+enum class AssetConversionReason {
+    OK,
+    ORIGINAL_IS_SMALLER,
 }

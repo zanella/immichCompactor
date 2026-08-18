@@ -54,8 +54,13 @@
                             <button hx-post="/users/{id}/assets/{asset.assetId}/convert"
                                     hx-target="closest tr"
                                     hx-swap="outerHTML"
-                                    class="inline-flex items-center gap-1 px-2 py-1 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700 transition-colors">
-                                Convert
+                                    hx-disabled-elt="this"
+                                    class="inline-flex items-center justify-center gap-1 min-w-16 px-2 py-1 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700 htmx-request:bg-emerald-500 htmx-request:cursor-wait disabled:opacity-70 disabled:cursor-wait transition-colors">
+                                <svg class="hidden htmx-request:block animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"></path>
+                                </svg>
+                                <span class="htmx-request:hidden">Convert</span>
                             </button>
                         </div>
                     </td>

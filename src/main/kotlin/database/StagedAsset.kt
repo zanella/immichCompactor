@@ -27,7 +27,8 @@ data class StagedAsset(
 
 enum class AssetConversionStates {
     QUEUED,
-    OBSOLETE,
+    WAITING_DELETION,
+    KEEP_AS_IS,
 }
 
 @ApplicationScoped

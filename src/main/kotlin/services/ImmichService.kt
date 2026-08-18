@@ -7,10 +7,13 @@ import database.StagedAsset
 import database.UserId
 import integration.immich.AssetMediaResponseDto
 import integration.immich.AssetResponseDto
+import integration.immich.CreateTagRequest
+import integration.immich.IMMICH_COMPACTOR_TAG_NAME
 import integration.immich.ImmichClient
 import integration.immich.ImmichLoggingFilter
 import integration.immich.SearchAssetsRequest
 import integration.immich.SearchAssetsResponse
+import integration.immich.TagResponseDto
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.MediaType
@@ -113,7 +116,7 @@ class ImmichService(
                     assetStagingAreaRepository
                         .listAll()
                         // TODO: filter on DB query, instead of return
-                        .filter { it.currentState == AssetConversionStates.QUEUED }
+                        .filter { it.currentState != AssetConversionStates.WAITING_DELETION }
                         .map { it.assetId }
                         .toSet()
 
@@ -219,7 +222,6 @@ class ImmichService(
 
     // /////////////////////////////////////////////////////////////////////////
 
-    /* TODO: Immich doesn't return tags on the search/metadata endpoint :-/
     fun upsertTag(
         apiKey: String,
         client: ImmichClient,
@@ -231,7 +233,7 @@ class ImmichService(
                 .createTag(
                     apiKey,
                     CreateTagRequest(name = IMMICH_COMPACTOR_TAG_NAME),
-                ) */
+                )
 
     // /////////////////////////////////////////////////////////////////////////
 
@@ -250,7 +252,7 @@ class ImmichService(
             -> HandledContentType.IMAGE_TO_JPEG_XL
             "3gp", "3gpp", "avi", "flv", "m4v", "mkv", "mts", "m2ts", "m2t", "mp4", "insv",
             "mpg", "mpe", "mpeg", "mov", "webm", "wmv",
-            -> HandledContentType.VIDEO_BY_HANDBRAKE
+            -> HandledContentType.VIDEO_TO_H265
             else
             -> HandledContentType.UNKNOWN
         }
@@ -260,5 +262,5 @@ class ImmichService(
 enum class HandledContentType {
     UNKNOWN,
     IMAGE_TO_JPEG_XL,
-    VIDEO_BY_HANDBRAKE,
+    VIDEO_TO_H265,
 }
