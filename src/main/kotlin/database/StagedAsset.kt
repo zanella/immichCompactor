@@ -10,6 +10,7 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 import jakarta.transaction.Transactional
+import services.ContentType
 import java.util.UUID
 
 @Entity
@@ -20,6 +21,10 @@ data class StagedAsset(
     @Id
     @Column(name = "asset_id")
     val assetId: UUID,
+    @Column(name = "content_type")
+    @Enumerated(EnumType.STRING)
+    val contentType: ContentType,
+    // TODO:  And tag -> If tagged -> skip, and then -> let's go!!!
     @Column("current_state")
     @Enumerated(EnumType.STRING)
     var currentState: AssetConversionStates,

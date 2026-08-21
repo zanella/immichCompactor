@@ -98,7 +98,7 @@ class UserResource(
 
             userFormData(userDetails.instance(), id, user.name, user.immichServerUrl, user.apiKey)
                 .data("serverVersion", serverVersion)
-            // .data("tagId", tagId)
+                .data("tagId", tagId)
         }
 
     @POST

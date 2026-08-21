@@ -9,6 +9,7 @@ import database.UserId
 import database.UserInfo
 import database.getById
 import integration.immich.AssetMediaStatus
+import integration.immich.BulkTagAssetsDto
 import integration.immich.CopyAssetRequest
 import integration.immich.DeleteAssetsRequest
 import integration.immich.ImmichClient
@@ -27,17 +28,32 @@ class AssetConversionService(
     private val convertedAssetsRepository: ConvertedAssetsRepository,
     private val immichService: ImmichService,
 ) {
-    /** TODO:
-     * fun processQueuedAssets(
-     *         client: ImmichClient,
-     *         userInfo: UserInfo
-     *     ) {
-     */
+    fun processQueuedAssets(
+        client: ImmichClient,
+        userInfo: UserInfo,
+        queuedAssetsId: Set<UUID>,
+        queuedAssetsContentTypes: Set<ContentType>,
+    ) {
+        /* val stagedAssetsIds = QuarkusTransaction.joiningExisting().call {
+            assetStagingAreaRepository
+                    .listAll()
+                    // TODO: filter on DB query, instead of return
+                    .filter { it.currentState == AssetConversionStates.QUEUED }
+                    .map { it.assetId }
+                    .toSet()
+        }*/
+
+        queuedAssetsId.forEach { assetId ->
+            processQueuedAsset(client, userInfo, assetId, queuedAssetsContentTypes)
+        }
+    }
 
     fun processQueuedAsset(
         client: ImmichClient,
         userInfo: UserInfo,
-        queuedAssetsId: UUID,
+        queuedAssetId: UUID,
+        queuedAssetsContentTypes: Set<ContentType> = ContentType.entries.toSet(),
+        // TODO: return actual action, inferring from null is not good
     ): UUID? {
         val deferredListOfFilesToDelete = mutableListOf<File?>()
 
@@ -53,7 +69,7 @@ class AssetConversionService(
 
             val stagedAsset =
                 QuarkusTransaction.joiningExisting().call {
-                    assetStagingAreaRepository.findById(queuedAssetsId)
+                    assetStagingAreaRepository.findById(queuedAssetId)
                 } ?: return null
 
             println("stagedAsset: $stagedAsset")
@@ -71,6 +87,15 @@ class AssetConversionService(
             }
 
             val (_, suffix) = splitFileName(assetInfo.originalFileName).also { require(it.second.isNotBlank()) }
+
+            // ////
+
+            if (getSuffixFromMimeType(suffix).contentType !in queuedAssetsContentTypes) {
+                // TODO: this breaks the UI,
+                return null
+            }
+
+            // ////
 
             // Download the asset
             val downloadFd =
@@ -140,13 +165,13 @@ class AssetConversionService(
                 ),
             )
 
-            /*  TODO: Tag the assets that have been converted
-                    client.bulkTagAssets(
-                            userInfo.apiKey,
-                            BulkTagAssetsDto(assetIds = listOf(uploadResponse.id), tagIds = listOf(tagId)),
-                        ).also {
-                            require(it.count == 1) { "Immich didn't tag the new asset ${uploadResponse.id}" }
-                        } */
+            client
+                .bulkTagAssets(
+                    userInfo.apiKey,
+                    BulkTagAssetsDto(assetIds = listOf(uploadResponse.id), tagIds = listOf(tagId)),
+                ).also {
+                    require(it.count == 1) { "Immich didn't tag the new asset ${uploadResponse.id}" }
+                }
 
             stagedAsset.currentState = AssetConversionStates.WAITING_DELETION
             replacementEntity.currentState = ConvertedAssetStates.COMPLETE
@@ -252,15 +277,15 @@ class AssetConversionService(
             AssetConversionReturn(convertedFd, AssetConversionReason.OK)
         }
     }
-
-    private fun splitFileName(fileName: String): Pair<String, String> =
-        // If there is no dot, the entire string is the base name, and the suffix is empty
-        if (!fileName.contains(".")) {
-            Pair(fileName, "")
-        } else {
-            Pair(fileName.substringBeforeLast("."), fileName.substringAfterLast(".").lowercase().trim())
-        }
 }
+
+fun splitFileName(fileName: String): Pair<String, String> =
+    // If there is no dot, the entire string is the base name, and the suffix is empty
+    if (!fileName.contains(".")) {
+        Pair(fileName, "")
+    } else {
+        Pair(fileName.substringBeforeLast("."), fileName.substringAfterLast(".").lowercase().trim())
+    }
 
 data class AssetConversionReturn(
     val convertedFile: File?,

@@ -22,6 +22,7 @@ CREATE TABLE user_info (
 CREATE TABLE assets_staging_area (
     user_id         bigint NOT NULL,
     asset_id        uuid NOT NULL PRIMARY KEY,
+    content_type    text NOT NULL,
     current_state   text NOT NULL,
 
     FOREIGN KEY (user_id) REFERENCES user_info(id) ON DELETE CASCADE

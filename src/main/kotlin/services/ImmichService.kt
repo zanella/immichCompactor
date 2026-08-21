@@ -60,8 +60,6 @@ class ImmichService(
     ): AssetResponseDto? {
         val response = client.getAssetInfo(apiKey, assetId)
 
-        println("response: ${response.status}")
-
         // TODO: Immich returns 400, instead of 404, if the asset is not found...
         if (response.status == 400) {
             return null
@@ -135,29 +133,36 @@ class ImmichService(
 
             val assetsToBeStaged =
                 searchAssetsResponse.items
-                    /* TODO: Immich doesn't return tags .filter {
-                        if (it.tags.isNotEmpty()) {
-                            println("Found ${it.tags} tags")
-                        }
-
-                        // If not tagged by immichCompactor -> not converted by it :-)
-                        it.tags
-                            .filter { tag -> tag.name == IMMICH_COMPACTOR_TAG_NAME }
-                            .toSet()
-                            .isEmpty()
-                    }*/
                     .filter { !skippableAssets.contains(it.id) }
                     .filter { !it.isTrashed }
-                    .map { asset ->
+                    .filter { asset ->
+                        val tagFound =
+                            getAssetInfo(apiKey, asset.id, client)
+                                ?.tags
+                                ?.filter { tag -> tag.name == IMMICH_COMPACTOR_TAG_NAME }
+                                ?.toSet()
+                                ?: emptySet()
+
+                        if (!tagFound.isEmpty()) {
+                            println("Asset [${asset.id}] is already tagged, skipping it")
+                            false
+                        } else {
+                            true
+                        }
+                    }.map { asset ->
                         StagedAsset(
                             userId = userId,
                             assetId = asset.id,
+                            contentType =
+                                splitFileName(asset.originalFileName)
+                                    .second
+                                    .let(::getSuffixFromMimeType)
+                                    .contentType,
                             currentState = AssetConversionStates.QUEUED,
                         )
                     }
 
-            // Short per-page transaction, so no DB connection is held while paging
-            // through the network.
+            // Short per-page transaction, so no DB connection is held while paging through the network.
             QuarkusTransaction.requiringNew().run {
                 assetStagingAreaRepository.persist(assetsToBeStaged)
             }
@@ -236,31 +241,37 @@ class ImmichService(
                 )
 
     // /////////////////////////////////////////////////////////////////////////
+}
 
-    private fun getSuffixFromMimeType(contentType: String?): HandledContentType {
-        if (contentType.isNullOrBlank()) return HandledContentType.UNKNOWN
+// TODO: rename
+fun getSuffixFromMimeType(contentType: String?): HandledContentType {
+    if (contentType.isNullOrBlank()) return HandledContentType.UNKNOWN
 
-        val subType =
-            contentType
-                .substringBefore(";")
-                .trim()
-                .lowercase()
-                .substringAfter("/", missingDelimiterValue = "")
+    val subType =
+        contentType
+            .substringBefore(";")
+            .trim()
+            .lowercase()
+            .substringAfter("/", missingDelimiterValue = "")
 
-        return when (subType) {
-            "jpeg", "jpg", "png", "pgx", "pam", "pnm", "pgm", "ppm", "pfm", "gif", "exr",
-            -> HandledContentType.IMAGE_TO_JPEG_XL
-            "3gp", "3gpp", "avi", "flv", "m4v", "mkv", "mts", "m2ts", "m2t", "mp4", "insv",
-            "mpg", "mpe", "mpeg", "mov", "webm", "wmv",
-            -> HandledContentType.VIDEO_TO_H265
-            else
-            -> HandledContentType.UNKNOWN
-        }
+    return when (subType) {
+        "jpeg", "jpg", "png", "pgx", "pam", "pnm", "pgm", "ppm", "pfm", "gif", "exr",
+        -> HandledContentType.IMAGE_TO_JPEG_XL
+        "3gp", "3gpp", "avi", "flv", "m4v", "mkv", "mts", "m2ts", "m2t", "mp4", "insv",
+        "mpg", "mpe", "mpeg", "mov", "webm", "wmv",
+        -> HandledContentType.VIDEO_TO_H265
+        else
+        -> HandledContentType.UNKNOWN
     }
 }
 
-enum class HandledContentType {
-    UNKNOWN,
-    IMAGE_TO_JPEG_XL,
-    VIDEO_TO_H265,
+enum class ContentType { NONE, IMAGE, VIDEO }
+
+// TODO: rename
+enum class HandledContentType(
+    val contentType: ContentType,
+) {
+    UNKNOWN(ContentType.NONE),
+    IMAGE_TO_JPEG_XL(ContentType.IMAGE),
+    VIDEO_TO_H265(ContentType.VIDEO),
 }
