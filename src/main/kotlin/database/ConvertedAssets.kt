@@ -35,6 +35,9 @@ enum class ConvertedAssetStates {
 class ConvertedAssetsRepository(
     private val entityManager: EntityManager,
 ) : PanacheRepositoryBase<ConvertedAsset, UUID> {
+    @Transactional
+    fun dropById(id: UUID) = deleteById(id)
+
     @Transactional // TODO: return attached entity ?
     fun store(entity: ConvertedAsset) = persist(entity)
 

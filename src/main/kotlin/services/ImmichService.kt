@@ -156,7 +156,7 @@ class ImmichService(
                             contentType =
                                 splitFileName(asset.originalFileName)
                                     .second
-                                    .let(::getSuffixFromMimeType)
+                                    .let(::getHandledContentTypeFromFileType)
                                     .contentType,
                             currentState = AssetConversionStates.QUEUED,
                         )
@@ -181,7 +181,7 @@ class ImmichService(
         assetId: UUID,
         client: ImmichClient,
         targetOutputFile: File,
-    ): Pair<MediaType, HandledContentType> {
+    ) {
         // 1. Fire the request and obtain the network socket reference
         val response = client.assetDownloadOriginal(apiKey, assetId)
 
@@ -201,10 +201,6 @@ class ImmichService(
         }
 
         println("Successfully wrote asset binary stream to: ${targetOutputFile.absolutePath}")
-
-        return response
-            .getHeaderString("Content-Type")
-            .let { MediaType.valueOf(it) to getSuffixFromMimeType(it) }
     }
 
     fun uploadLocalFile(
@@ -243,18 +239,8 @@ class ImmichService(
     // /////////////////////////////////////////////////////////////////////////
 }
 
-// TODO: rename
-fun getSuffixFromMimeType(contentType: String?): HandledContentType {
-    if (contentType.isNullOrBlank()) return HandledContentType.UNKNOWN
-
-    val subType =
-        contentType
-            .substringBefore(";")
-            .trim()
-            .lowercase()
-            .substringAfter("/", missingDelimiterValue = "")
-
-    return when (subType) {
+fun getHandledContentTypeFromFileType(fileType: String): HandledContentType =
+    when (fileType) {
         "jpeg", "jpg", "png", "pgx", "pam", "pnm", "pgm", "ppm", "pfm", "gif", "exr",
         -> HandledContentType.IMAGE_TO_JPEG_XL
         "3gp", "3gpp", "avi", "flv", "m4v", "mkv", "mts", "m2ts", "m2t", "mp4", "insv",
@@ -263,15 +249,14 @@ fun getSuffixFromMimeType(contentType: String?): HandledContentType {
         else
         -> HandledContentType.UNKNOWN
     }
-}
 
-enum class ContentType { NONE, IMAGE, VIDEO }
+enum class ContentType { UNKNOWN, IMAGE, VIDEO }
 
 // TODO: rename
 enum class HandledContentType(
     val contentType: ContentType,
 ) {
-    UNKNOWN(ContentType.NONE),
+    UNKNOWN(ContentType.UNKNOWN),
     IMAGE_TO_JPEG_XL(ContentType.IMAGE),
     VIDEO_TO_H265(ContentType.VIDEO),
 }

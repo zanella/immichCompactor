@@ -24,7 +24,6 @@ data class StagedAsset(
     @Column(name = "content_type")
     @Enumerated(EnumType.STRING)
     val contentType: ContentType,
-    // TODO:  And tag -> If tagged -> skip, and then -> let's go!!!
     @Column("current_state")
     @Enumerated(EnumType.STRING)
     var currentState: AssetConversionStates,
@@ -49,11 +48,34 @@ class AssetStagingAreaRepository : PanacheRepositoryBase<StagedAsset, UUID> {
         userId: UserId,
         pageIndex: Int,
         pageSize: Int,
-    ): List<StagedAsset> =
-        find("userId = ?1 and currentState = ?2", userId, AssetConversionStates.QUEUED)
+        contentTypes: List<ContentType>,
+    ): List<StagedAsset> {
+        val query =
+            buildString {
+                append("userId = ?1 and currentState = ?2")
+                append(" and contentType in ?3")
+            }
+
+        val effectiveContentTypes = contentTypes.ifEmpty { ContentType.entries.toList() }
+
+        return find(query, userId, AssetConversionStates.QUEUED, effectiveContentTypes)
             .page(pageIndex, pageSize)
             .list()
+    }
 
     @Transactional
-    fun countQueuedByUserId(userId: UserId): Long = count("userId = ?1 and currentState = ?2", userId, AssetConversionStates.QUEUED)
+    fun countQueuedByUserId(
+        userId: UserId,
+        contentTypes: List<ContentType>,
+    ): Long {
+        val query =
+            buildString {
+                append("userId = ?1 and currentState = ?2")
+                append(" and contentType in ?3")
+            }
+
+        val effectiveContentTypes = contentTypes.ifEmpty { ContentType.entries.toList() }
+
+        return count(query, userId, AssetConversionStates.QUEUED, effectiveContentTypes)
+    }
 }

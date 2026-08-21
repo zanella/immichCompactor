@@ -16,6 +16,7 @@ import integration.immich.ImmichClient
 import internal.lang.runCatchingSafely
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.ws.rs.core.MediaType
 import services.HandledContentType.UNKNOWN
 import java.io.File
 import java.nio.file.Files
@@ -90,7 +91,9 @@ class AssetConversionService(
 
             // ////
 
-            if (getSuffixFromMimeType(suffix).contentType !in queuedAssetsContentTypes) {
+            val fileType = getHandledContentTypeFromFileType(suffix)
+
+            if (fileType.contentType !in queuedAssetsContentTypes) {
                 // TODO: this breaks the UI,
                 return null
             }
@@ -102,13 +105,12 @@ class AssetConversionService(
                 File(tmpDir, "originalDownloaded.$suffix")
                     .also(deferredListOfFilesToDelete::add)
 
-            val (mediaType, fileType) =
-                immichService.downloadAssetToDisk(
-                    apiKey = userInfo.apiKey,
-                    assetId = assetInfo.id,
-                    client = client,
-                    targetOutputFile = downloadFd,
-                )
+            immichService.downloadAssetToDisk(
+                apiKey = userInfo.apiKey,
+                assetId = assetInfo.id,
+                client = client,
+                targetOutputFile = downloadFd,
+            )
 
             // Convert it
             val conversionResponse =
@@ -129,6 +131,9 @@ class AssetConversionService(
                     }
                 }
 
+            // TODO: get from the actual converted file
+            val mediaType = MediaType.valueOf("video/mp4")
+
             // Upload the converted asset
             val uploadResponse =
                 immichService
@@ -142,6 +147,8 @@ class AssetConversionService(
                             "Immich said ${convertedFd.name} is a ${it.status}"
                         }
                     }
+
+            // TODO: save state: if the service dies pick up from here
 
             // Replacement: Save state
             val replacementEntity =
@@ -184,7 +191,11 @@ class AssetConversionService(
                 DeleteAssetsRequest(ids = listOf(assetInfo.id), force = false),
             )
 
-            QuarkusTransaction.joiningExisting().call { assetStagingAreaRepository.dropById(assetInfo.id) }
+            QuarkusTransaction.joiningExisting().call {
+                assetStagingAreaRepository.dropById(assetInfo.id)
+
+                convertedAssetsRepository.dropById(replacementEntity.assetId)
+            }
 
             return uploadResponse.id
         } finally {

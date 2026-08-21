@@ -21,6 +21,7 @@ import jakarta.ws.rs.QueryParam
 import jakarta.ws.rs.core.MediaType
 import services.AssetConversionService
 import services.AssetRefreshJobService
+import services.ContentType
 import services.ImmichService
 import java.util.UUID
 
@@ -183,7 +184,11 @@ class UserResource(
     @Produces(MediaType.TEXT_HTML)
     fun assetsRefreshStatus(
         @PathParam("id") id: UserId,
-    ): TemplateInstance = assetsRefreshStatusFragment(id, assetRefreshJobService.status(id))
+    ): TemplateInstance {
+        val user = userInfoRepository.getById(id.value)
+
+        return assetsRefreshStatusFragment(id, user.name, assetRefreshJobService.status(id))
+    }
 
     @POST
     @Path("/users/{id}/assets/refresh")
@@ -191,11 +196,12 @@ class UserResource(
     fun refreshAssets(
         @PathParam("id") id: UserId,
     ): TemplateInstance {
-        userInfoRepository.getById(id.value).also {
-            assetRefreshJobService.start(id, it.apiKey, it.immichServerUrl)
-        }
+        val user =
+            userInfoRepository.getById(id.value).also {
+                assetRefreshJobService.start(id, it.apiKey, it.immichServerUrl)
+            }
 
-        return assetsRefreshStatusFragment(id, assetRefreshJobService.status(id))
+        return assetsRefreshStatusFragment(id, user.name, assetRefreshJobService.status(id))
     }
 
     @GET
@@ -205,14 +211,20 @@ class UserResource(
         @PathParam("id") id: UserId,
         @QueryParam("page") @DefaultValue("1") page: Int,
         @QueryParam("size") @DefaultValue("50") size: Int,
+        @QueryParam("contentTypes") contentTypes: List<String>?,
     ): TemplateInstance {
         val safePage = page.coerceAtLeast(1)
-        val safeSize = size.coerceIn(1, 200)
+        val safeSize = size.coerceIn(1, 1000)
         val pageIndex = safePage - 1
 
+        val selectedContentTypes =
+            contentTypes
+                ?.mapNotNull { runCatching { ContentType.valueOf(it) }.getOrNull() }
+                ?: emptyList()
+
         val user = userInfoRepository.getById(id.value)
-        val items = assetStagingAreaRepository.findQueuedByUserId(id, pageIndex, safeSize)
-        val total = assetStagingAreaRepository.countQueuedByUserId(id)
+        val items = assetStagingAreaRepository.findQueuedByUserId(id, pageIndex, safeSize, selectedContentTypes)
+        val total = assetStagingAreaRepository.countQueuedByUserId(id, selectedContentTypes)
         val pageCount = ((total + safeSize - 1) / safeSize).toInt().coerceAtLeast(1)
 
         return assetsList
@@ -228,6 +240,8 @@ class UserResource(
             .data("hasNext", safePage < pageCount)
             .data("prevPage", (safePage - 1).coerceAtLeast(1))
             .data("nextPage", (safePage + 1).coerceAtMost(pageCount))
+            .data("contentTypes", ContentType.entries)
+            .data("selectedContentTypes", selectedContentTypes.map { it.name })
     }
 
     @POST
@@ -249,9 +263,10 @@ class UserResource(
             if (newAssetId == null) {
                 // Trashed or not found — it was removed from the queue, nothing to link to.
                 """
-                <tr class="border-b border-gray-100 opacity-40 pointer-events-none select-none">
+                <tr class="border-b border-gray-100 opacity-40 pointer-events-none select-none whitespace-nowrap">
                     <td class="py-2 px-3 text-gray-400 text-xs"></td>
                     <td class="py-2 px-3 font-mono text-xs text-gray-400 line-through">$assetId</td>
+                    <td class="py-2 px-3"></td>
                     <td class="py-2 px-3">
                         <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Removed</span>
                     </td>
@@ -264,20 +279,24 @@ class UserResource(
 
                 // TODO: move to template
                 """
-                <tr class="border-b border-gray-100 opacity-40 select-none">
+                <tr class="border-b border-gray-100 select-none whitespace-nowrap">
                     <td class="py-2 px-3 text-gray-400 text-xs"></td>
                     <td class="py-2 px-3 font-mono text-xs text-gray-400 line-through">$assetId</td>
+                    <td class="py-2 px-3"></td>
                     <td class="py-2 px-3">
                         <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Converted</span>
                     </td>
                     <td class="py-2 px-3 text-right">
-                        <a href="$baseUrl/photos/$newAssetId"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 transition-colors">
-                            View new
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                        </a>
+                        <div class="inline-flex items-center gap-2">
+                            <a href="$baseUrl/photos/$assetId"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="inline-flex items-center gap-1 px-2 py-1 border-2 border-red-500 text-red-700 bg-white text-xs font-bold rounded hover:bg-red-50 transition-colors whitespace-nowrap"><span>View OLD</span><svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>
+                            <a href="$baseUrl/photos/$newAssetId"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 transition-colors whitespace-nowrap"><span>View new</span><svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>
+                        </div>
                     </td>
                 </tr>
                 """.trim()
@@ -285,7 +304,7 @@ class UserResource(
         } catch (e: Exception) {
             println(e.stackTraceToString())
 
-            "<tr><td colspan=\"4\" class=\"py-2 px-3 text-red-600 text-xs\">Conversion failed: ${e.message}</td></tr>"
+            "<tr><td colspan=\"5\" class=\"py-2 px-3 text-red-600 text-xs\">Conversion failed: ${e.message}</td></tr>"
         }
     }
 
@@ -317,11 +336,13 @@ class UserResource(
 
     private fun assetsRefreshStatusFragment(
         id: UserId,
+        name: String,
         status: AssetRefreshJobService.JobStatus?,
     ): TemplateInstance =
         assetsStatus
             .instance()
             .data("id", id.value)
+            .data("name", name)
             .data("running", status?.state == AssetRefreshJobService.State.RUNNING)
             .data("done", status?.state == AssetRefreshJobService.State.DONE)
             .data("failed", status?.state == AssetRefreshJobService.State.FAILED)

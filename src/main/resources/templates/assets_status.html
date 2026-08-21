@@ -1,10 +1,14 @@
 <div id="asset-refresh"
      {#if running}hx-get="/users/{id}/assets/status" hx-trigger="every 2s" hx-swap="outerHTML"{/if}>
-    <button hx-post="/users/{id}/assets/refresh" hx-target="#asset-refresh" hx-swap="outerHTML"
-            {#if running}disabled{/if}
-            class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-        {#if running}Refreshing…{#else}Refresh{/if}
-    </button>
+    <div class="flex items-center justify-between mt-4 mb-6">
+        <h2 class="text-3xl font-extrabold text-indigo-600">Assets — {name}</h2>
+        <button hx-post="/users/{id}/assets/refresh" hx-target="#asset-refresh" hx-swap="outerHTML"
+                hx-disabled-elt="this"
+                {#if running}disabled{/if}
+                class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {#if running}Refreshing…{#else}Refresh{/if}
+        </button>
+    </div>
 
     {#if running}
         <div class="mt-4 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-sm">

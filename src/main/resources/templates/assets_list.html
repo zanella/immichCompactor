@@ -1,19 +1,40 @@
 <div id="assets-list" class="mt-6">
-    <!-- Header: page size selector + total count -->
-    <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2">
-            <label for="page-size" class="text-sm text-gray-600">Page size:</label>
-            <select id="page-size" name="size"
-                    hx-get="/users/{id}/assets/queued?page=1"
-                    hx-target="#assets-list"
-                    hx-swap="outerHTML"
-                    class="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                <option value="10" {#if size == 10}selected{/if}>10</option>
-                <option value="25" {#if size == 25}selected{/if}>25</option>
-                <option value="50" {#if size == 50}selected{/if}>50</option>
-                <option value="100" {#if size == 100}selected{/if}>100</option>
-            </select>
-        </div>
+    <!-- Header: page size selector + content type filters + total count -->
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
+        <form class="flex items-center gap-4 flex-wrap" onsubmit="return false">
+            <div class="flex items-center gap-2">
+                <label for="page-size" class="text-sm text-gray-600 whitespace-nowrap">Page size:</label>
+                <select id="page-size" name="size"
+                        hx-get="/users/{id}/assets/queued?page=1"
+                        hx-target="#assets-list"
+                        hx-swap="outerHTML"
+                        class="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                    <option value="10" {#if size == 10}selected{/if}>10</option>
+                    <option value="25" {#if size == 25}selected{/if}>25</option>
+                    <option value="50" {#if size == 50}selected{/if}>50</option>
+                    <option value="100" {#if size == 100}selected{/if}>100</option>
+                    <option value="1000" {#if size == 1000}selected{/if}>1000</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-sm text-gray-600">Content Type:</span>
+                {#for ct in contentTypes}
+                <label class="flex items-center gap-1 text-sm cursor-pointer select-none whitespace-nowrap">
+                    <input type="checkbox" name="contentTypes" value="{ct.name}"
+                           {#if selectedContentTypes.contains(ct.name)}checked{/if}
+                           hx-get="/users/{id}/assets/queued?page=1"
+                           hx-target="#assets-list"
+                           hx-swap="outerHTML"
+                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    {ct.name}
+                </label>
+                {/for}
+            </div>
+        </form>
+        <button id="batch-convert-btn" type="button"
+                class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-md hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+            Batch convert
+        </button>
         <span class="text-sm text-gray-500">{total} queued asset(s)</span>
     </div>
 
@@ -21,13 +42,15 @@
     {#if assets.size == 0}
         <p class="text-gray-500 text-sm italic">No queued assets.</p>
     {#else}
-        <table class="w-full text-sm border-collapse">
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse whitespace-nowrap">
             <thead>
                 <tr class="border-b border-gray-200 bg-gray-50">
                     <th class="text-left py-2 px-3 text-gray-600 font-medium w-12">#</th>
                     <th class="text-left py-2 px-3 text-gray-600 font-medium">Asset ID</th>
+                    <th class="text-left py-2 px-3 text-gray-600 font-medium w-28 whitespace-nowrap">Content Type</th>
                     <th class="text-left py-2 px-3 text-gray-600 font-medium w-28">State</th>
-                    <th class="text-right py-2 px-3 text-gray-600 font-medium w-48"></th>
+                    <th class="text-right py-2 px-3 text-gray-600 font-medium"></th>
                 </tr>
             </thead>
             <tbody>
@@ -37,20 +60,25 @@
                     <td class="py-2 px-3 font-mono text-xs text-gray-700">{asset.assetId}</td>
                     <td class="py-2 px-3">
                         <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full
+                            {#if asset.contentType.name == 'VIDEO'}bg-blue-100 text-blue-800
+                            {#else if asset.contentType.name == 'IMAGE'}bg-green-100 text-green-800
+                            {#else}bg-gray-100 text-gray-600{/if}">
+                            {asset.contentType.name}
+                        </span>
+                    </td>
+                    <td class="py-2 px-3">
+                        <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full
                             {#if asset.currentState.name == 'QUEUED'}bg-amber-100 text-amber-800
                             {#else}bg-gray-100 text-gray-600{/if}">
                             {asset.currentState.name}
                         </span>
                     </td>
-                    <td class="py-2 px-3 text-right">
+                    <td class="py-2 px-3 text-right whitespace-nowrap">
                         <div class="inline-flex items-center gap-2">
                             <a href="{immichServerUrl}/photos/{asset.assetId}"
                                target="_blank"
                                rel="noopener noreferrer"
-                               class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 transition-colors">
-                                View
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                            </a>
+                               class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 transition-colors whitespace-nowrap"><span>View</span><svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>
                             <button hx-post="/users/{id}/assets/{asset.assetId}/convert"
                                     hx-target="closest tr"
                                     hx-swap="outerHTML"
@@ -68,13 +96,14 @@
                 {/for}
             </tbody>
         </table>
+        </div>
     {/if}
 
     <!-- Pagination links -->
     {#if pageCount > 1}
     <div class="flex items-center justify-center gap-3 mt-4">
         {#if hasPrev}
-        <a hx-get="/users/{id}/assets/queued?page={prevPage}&size={size}"
+        <a hx-get="/users/{id}/assets/queued?page={prevPage}&size={size}{#for ct in selectedContentTypes}&contentTypes={ct}{/for}"
            hx-target="#assets-list"
            hx-swap="outerHTML"
            href="#"
@@ -90,7 +119,7 @@
         <span class="text-sm text-gray-600">Page {page} of {pageCount}</span>
 
         {#if hasNext}
-        <a hx-get="/users/{id}/assets/queued?page={nextPage}&size={size}"
+        <a hx-get="/users/{id}/assets/queued?page={nextPage}&size={size}{#for ct in selectedContentTypes}&contentTypes={ct}{/for}"
            hx-target="#assets-list"
            hx-swap="outerHTML"
            href="#"
@@ -104,4 +133,55 @@
         {/if}
     </div>
     {/if}
+
+    <script>
+        document.addEventListener('htmx:configRequest', function(e) {
+            if (e.detail.elt.closest('#assets-list')) {
+                var select = document.getElementById('page-size');
+                if (select && !('size' in e.detail.parameters)) {
+                    e.detail.parameters.size = select.value;
+                }
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('#batch-convert-btn');
+            if (!btn || btn.disabled) return;
+
+            var convertBtns = Array.from(document.querySelectorAll('#assets-list tbody button[hx-post*="/convert"]'));
+            if (!convertBtns.length) return;
+
+            btn.disabled = true;
+            var originalText = btn.textContent;
+            var total = convertBtns.length;
+            var i = 0;
+
+            function clickNext() {
+                if (i >= total) {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    return;
+                }
+                var current = convertBtns[i++];
+                btn.textContent = 'Converting ' + i + '/' + total + '…';
+
+                if (!document.contains(current)) {
+                    clickNext();
+                    return;
+                }
+
+                current.click();
+
+                function poll() {
+                    if (!document.contains(current)) {
+                        setTimeout(clickNext, 300);
+                    } else {
+                        setTimeout(poll, 50);
+                    }
+                }
+                setTimeout(poll, 100);
+            }
+            clickNext();
+        });
+    </script>
 </div>

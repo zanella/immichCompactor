@@ -10,6 +10,9 @@ quarkus:
       enabled: false
   flyway:
     migrate-at-start: true
+  web-bundler:
+    dependencies:
+      compile-only: false
 
 "%dev": # these configs are for local development (quarkusDev)
   quarkus:
