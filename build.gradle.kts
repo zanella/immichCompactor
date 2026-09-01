@@ -41,9 +41,8 @@ dependencies {
     implementation("com.linecorp.kotlin-jdsl:jpql-dsl:$jdsl3Version")
     implementation("com.linecorp.kotlin-jdsl:jpql-render:$jdsl3Version")
     implementation("com.linecorp.kotlin-jdsl:support:$jdsl3Version")
-    implementation("io.quarkus:quarkus-jdbc-postgresql")
+    implementation("io.quarkiverse.jdbc:quarkus-jdbc-sqlite:3.0.11")
     implementation("io.quarkus:quarkus-flyway")
-    runtimeOnly("org.flywaydb:flyway-database-postgresql:10.20.0")
 
     // Validation
     // implementation("org.hibernate.validator:hibernate-validator:8.0.1.Final")

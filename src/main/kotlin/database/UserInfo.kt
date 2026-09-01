@@ -25,15 +25,15 @@ data class UserInfo(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    private var _id: Long? = null
+    private var _id: Int? = null
 
     // TODO: return value class
-    val id: Long
+    val id: Int
         get() = _id ?: throw IllegalStateException("Entity is not persisted yet")
 }
 
 @ApplicationScoped
-class UserInfoRepository : PanacheRepositoryBase<UserInfo, Long>
+class UserInfoRepository : PanacheRepositoryBase<UserInfo, Int>
 
 inline fun <reified E : Any, T : Any> PanacheRepositoryBase<E, T>.getById(
     id: T,

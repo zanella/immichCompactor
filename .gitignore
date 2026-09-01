@@ -2,6 +2,7 @@
 ### Custom ###
 /sandbox/library
 /sandbox/postgres
+/sandbox/immich_compactor.db
 .idea
 qwenClaude.sh
 .claude/

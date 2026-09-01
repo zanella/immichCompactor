@@ -1,15 +1,14 @@
 quarkus:
   datasource:
-    db-kind: postgresql
-    username: postgres
-    password: postgres
+    db-kind: sqlite
     jdbc:
-      # TODO: point to the docker container from the same compose
-      url: jdbc:postgresql://localhost:5435/immich_compactor
-    devservices:
-      enabled: false
+      url: jdbc:sqlite:data/immich_compactor.db
+      new-connection-sql: "PRAGMA foreign_keys = ON;"
   flyway:
     migrate-at-start: true
+  hibernate-orm:
+    database:
+      generation: validate
   web-bundler:
     dependencies:
       compile-only: false
@@ -20,12 +19,7 @@ quarkus:
       auth:
         enabled-in-dev-mode: false
     datasource:
-      db-kind: postgresql
-      username: postgres
-      password: postgres
       jdbc:
-        url: jdbc:postgresql://localhost:5435/immich_compactor
-    hibernate-orm:
-      schema-management:
-        strategy: validate
+        url: jdbc:sqlite:sandbox/immich_compactor.db
+        new-connection-sql: "PRAGMA foreign_keys = ON;"
 #EOF

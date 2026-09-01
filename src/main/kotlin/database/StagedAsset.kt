@@ -10,6 +10,8 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 import jakarta.transaction.Transactional
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import services.ContentType
 import java.util.UUID
 
@@ -20,6 +22,7 @@ data class StagedAsset(
     val userId: UserId,
     @Id
     @Column(name = "asset_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     val assetId: UUID,
     @Column(name = "content_type")
     @Enumerated(EnumType.STRING)

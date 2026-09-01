@@ -9,15 +9,15 @@ import jakarta.persistence.Converter
  * with AttributeConverter/accessor invocation because of JVM name mangling.
  */
 data class UserId(
-    val value: Long,
+    val value: Int,
 ) {
     // Single-String constructor so JAX-RS can bind it straight from a @PathParam.
-    constructor(value: String) : this(value.toLong())
+    constructor(value: String) : this(value.toInt())
 }
 
 @Converter(autoApply = true)
-class UserIdConverter : AttributeConverter<UserId, Long> {
-    override fun convertToDatabaseColumn(attribute: UserId?): Long? = attribute?.value
+class UserIdConverter : AttributeConverter<UserId, Int> {
+    override fun convertToDatabaseColumn(attribute: UserId?): Int? = attribute?.value
 
-    override fun convertToEntityAttribute(dbData: Long?): UserId? = dbData?.let(::UserId)
+    override fun convertToEntityAttribute(dbData: Int?): UserId? = dbData?.let(::UserId)
 }
