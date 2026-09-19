@@ -220,6 +220,7 @@ class UserResource(
         val selectedContentTypes =
             contentTypes
                 ?.mapNotNull { runCatching { ContentType.valueOf(it) }.getOrNull() }
+                ?.minus(ContentType.UNHANDLED)
                 ?: emptyList()
 
         val user = userInfoRepository.getById(id.value)

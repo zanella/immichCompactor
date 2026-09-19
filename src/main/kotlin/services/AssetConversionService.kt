@@ -59,7 +59,7 @@ class AssetConversionService(
         val deferredListOfFilesToDelete = mutableListOf<File?>()
 
         try {
-            // TODO: what was this tag supposed to do ?
+            // TODO: do this once, save the tagId on a global by lazy
             val tagId = immichService.upsertTag(userInfo.apiKey, client).id
 
             val tmpDir =
@@ -214,6 +214,8 @@ class AssetConversionService(
         temporaryDir: File,
     ): AssetConversionReturn =
         when (fileType) {
+            HandledContentType.UNHANDLED_IMAGE ->
+                throw IllegalStateException("Should not happen")
             UNKNOWN -> TODO()
             HandledContentType.IMAGE_TO_JPEG_XL -> convertImage(input, originalName, temporaryDir)
             HandledContentType.VIDEO_TO_H265 -> convertVideo(input, originalName, temporaryDir)

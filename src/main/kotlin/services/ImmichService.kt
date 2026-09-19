@@ -246,16 +246,19 @@ fun getHandledContentTypeFromFileType(fileType: String): HandledContentType =
         "3gp", "3gpp", "avi", "flv", "m4v", "mkv", "mts", "m2ts", "m2t", "mp4", "insv",
         "mpg", "mpe", "mpeg", "mov", "webm", "wmv",
         -> HandledContentType.VIDEO_TO_H265
+        "jxl",
+        -> HandledContentType.UNHANDLED_IMAGE
         else
         -> HandledContentType.UNKNOWN
     }
 
-enum class ContentType { UNKNOWN, IMAGE, VIDEO }
+enum class ContentType { UNHANDLED, UNKNOWN, IMAGE, VIDEO }
 
 // TODO: rename
 enum class HandledContentType(
     val contentType: ContentType,
 ) {
+    UNHANDLED_IMAGE(ContentType.UNHANDLED),
     UNKNOWN(ContentType.UNKNOWN),
     IMAGE_TO_JPEG_XL(ContentType.IMAGE),
     VIDEO_TO_H265(ContentType.VIDEO),
