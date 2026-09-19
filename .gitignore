@@ -54,3 +54,13 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+##################################################################
+### WEB UI ###
+##################################################################
+
+src/main/webui/.editorconfig
+src/main/webui/.gitattributes
+src/main/webui/.gitignore
+src/main/webui/node_modules
+src/main/webui/openapi.json

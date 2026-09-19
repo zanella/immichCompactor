@@ -2,6 +2,7 @@ package database
 
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntityBase
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepositoryBase
+import io.quarkus.runtime.annotations.RegisterForReflection
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -11,9 +12,12 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.LockModeType
 import jakarta.persistence.Table
+import kotlinx.serialization.Serializable
 
 @Entity
 @Table(name = "user_info")
+@Serializable
+@RegisterForReflection
 data class UserInfo(
     @Column("api_key")
     var apiKey: String,

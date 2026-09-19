@@ -9,9 +9,16 @@ quarkus:
   hibernate-orm:
     database:
       generation: validate
-  web-bundler:
-    dependencies:
-      compile-only: false
+  quinoa:
+    build-dir: dist
+    dev-server:
+      command: npm run dev
+      port: 5173
+    enable-spa-routing: true
+    ui-dir: src/main/webui
+  smallrye-openapi:
+    store-schema-directory: src/main/webui
+    auto-add-server: false
 
 "%dev": # these configs are for local development (quarkusDev)
   quarkus:

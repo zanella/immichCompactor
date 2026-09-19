@@ -1,39 +1,24 @@
 package api
 
 import database.AssetStagingAreaRepository
-import database.UserId
-import database.UserInfo
 import database.UserInfoRepository
-import database.getById
-import io.quarkus.narayana.jta.QuarkusTransaction
-import io.quarkus.qute.Location
-import io.quarkus.qute.Template
-import io.quarkus.qute.TemplateInstance
-import jakarta.ws.rs.Consumes
-import jakarta.ws.rs.DefaultValue
-import jakarta.ws.rs.FormParam
 import jakarta.ws.rs.GET
-import jakarta.ws.rs.POST
 import jakarta.ws.rs.Path
-import jakarta.ws.rs.PathParam
 import jakarta.ws.rs.Produces
-import jakarta.ws.rs.QueryParam
-import jakarta.ws.rs.core.MediaType
+import jakarta.ws.rs.core.MediaType.APPLICATION_JSON
 import services.AssetConversionService
 import services.AssetRefreshJobService
-import services.ContentType
 import services.ImmichService
-import java.util.UUID
 
 // TODO: clean it up :-), move logic to service
-@Path("/")
+@Path("/api/users")
 class UserResource(
     private val assetConversionService: AssetConversionService,
     private val assetRefreshJobService: AssetRefreshJobService,
     private val assetStagingAreaRepository: AssetStagingAreaRepository,
     private val immichService: ImmichService,
     private val userInfoRepository: UserInfoRepository,
-    //
+    /*
     @param:Location("index.html")
     private val users: Template,
     //
@@ -53,9 +38,13 @@ class UserResource(
     private val assetsStatus: Template,
     //
     @param:Location("assets_list.html")
-    private val assetsList: Template,
+    private val assetsList: Template, */
 ) {
     @GET
+    @Produces(APPLICATION_JSON)
+    fun users() = userInfoRepository.listAll()
+
+    /* @GET
     @Produces(MediaType.TEXT_HTML)
     fun users(): TemplateInstance =
         users
@@ -113,10 +102,10 @@ class UserResource(
         @FormParam("apiKey") apiKey: String,
     ): TemplateInstance = saveUser(id, name, immichServerUrl, apiKey)
 
-    /** TODO: move to service
+    / ** TODO: move to service
      * Shared create/update flow: [id] == null means "create a new entry", otherwise the
      * existing entry is updated. Same validation either way.
-     */
+     * /
     private fun saveUser(
         id: UserId?,
         name: String,
@@ -350,4 +339,5 @@ class UserResource(
             .data("assetsFound", status?.assetsFound ?: 0)
             .data("assetsQueued", status?.assetsQueued ?: 0)
             .data("error", status?.error)
+     */
 }
