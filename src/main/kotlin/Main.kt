@@ -13,7 +13,7 @@ class Main {
      *  - ORRRR: sqlite ?
      *
      * TODO API:
-     *  - fetch asset list -> delete one asset -> try to convert it
+     *  - fetch asset list -> delete one asset -> try to convert it -> ... why ?
      *
      * TODO:
      *  - Can the query sent to Immich already exclude the tagged entries ?
@@ -25,6 +25,7 @@ class Main {
      *
      * TODO - known bugs:
      *  - Immich not always tags the assets, need to fetch the asset and tag until it sticks
+     *  - Verify the new asset is retrievable -> once I saw Immich fail to load the new asset
      *
      * TODO: tests:
      *  - list assets
