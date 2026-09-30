@@ -10,10 +10,7 @@ import jakarta.persistence.Converter
  */
 data class UserId(
     val value: Int,
-) {
-    // Single-String constructor so JAX-RS can bind it straight from a @PathParam.
-    constructor(value: String) : this(value.toInt())
-}
+)
 
 @Converter(autoApply = true)
 class UserIdConverter : AttributeConverter<UserId, Int> {

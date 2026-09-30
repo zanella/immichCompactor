@@ -2,6 +2,10 @@
 openapi: 3.1.0
 components:
   schemas:
+    UUID:
+      type: string
+      format: uuid
+      pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
     UserAddParams:
       type: object
       properties:
@@ -20,6 +24,23 @@ components:
       - name
       - immichServerUrl
       - apiKey
+    UserDetails:
+      type: object
+      required:
+      - userInfo
+      - serverVersion
+      - tagId
+      properties:
+        userInfo:
+          $ref: "#/components/schemas/UserInfo"
+        serverVersion:
+          type:
+          - string
+          - "null"
+        tagId:
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
     UserInfo:
       type: object
       required:
@@ -69,6 +90,24 @@ paths:
                 items:
                   $ref: "#/components/schemas/UserInfo"
       summary: List Users
+      tags:
+      - User Resource
+  /api/users/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDetails"
+      summary: User Details
       tags:
       - User Resource
 info:

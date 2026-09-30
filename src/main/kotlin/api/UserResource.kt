@@ -1,18 +1,26 @@
+@file:UseSerializers(UUIDSerializer::class)
+
 package api
 
 import database.AssetStagingAreaRepository
+import database.UserId
 import database.UserInfo
 import database.UserInfoRepository
 import database.getById
+import internal.serdes.UUIDSerializer
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.ws.rs.GET
 import jakarta.ws.rs.POST
 import jakarta.ws.rs.Path
+import jakarta.ws.rs.PathParam
 import jakarta.ws.rs.Produces
 import jakarta.ws.rs.core.MediaType.APPLICATION_JSON
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import services.AssetConversionService
 import services.AssetRefreshJobService
 import services.ImmichService
+import java.util.UUID
 
 data class UserAddParams(
     val id: Int? = null,
@@ -86,6 +94,23 @@ class UserResource(
             }
         }
 
+    @GET
+    @Path("/{id}")
+    @Produces(APPLICATION_JSON)
+    fun userDetails(
+        @PathParam("id") rawUserId: String,
+    ): UserDetails =
+        userInfoRepository.getById(UserId(rawUserId.toInt()).value).let { user ->
+            // TODO: check it's >= 2
+            val client = immichService.instantiateClient(user.immichServerUrl)
+
+            UserDetails(
+                user,
+                runCatching { client.serverAbout(user.apiKey).version }.getOrNull(),
+                runCatching { immichService.upsertTag(user.apiKey, client).id }.getOrNull(),
+            )
+        }
+
     private fun apiKeyIsValid(
         immichServerUrl: String,
         apiKey: String,
@@ -93,8 +118,6 @@ class UserResource(
         runCatching {
             immichService.instantiateClient(immichServerUrl).authValidateToken(apiKey).authStatus
         }.getOrDefault(false)
-
-    // TemplateInstance = userFormData(userAdd.instance(), id = null, name = "", immichServerUrl = "", apiKey = "")
 
     /*
     @GET
@@ -112,30 +135,7 @@ class UserResource(
         @FormParam("apiKey") apiKey: String,
     ): TemplateInstance = saveUser(id = null, name = name, immichServerUrl = immichServerUrl, apiKey = apiKey)
 
-    @GET
-    @Path("/users/{id}")
-    @Produces(MediaType.TEXT_HTML)
-    fun userDetails(
-        @PathParam("id") id: UserId,
-    ): TemplateInstance =
-        userInfoRepository.getById(id.value).let { user ->
-            // TODO: check it's >= 2
-            val client = immichService.instantiateClient(user.immichServerUrl)
 
-            val serverVersion =
-                runCatching {
-                    client.serverAbout(user.apiKey).version
-                }.getOrNull()
-
-            val tagId =
-                runCatching {
-                    immichService.upsertTag(user.apiKey, client).id
-                }.getOrNull()
-
-            userFormData(userDetails.instance(), id, user.name, user.immichServerUrl, user.apiKey)
-                .data("serverVersion", serverVersion)
-                .data("tagId", tagId)
-        }
 
     @POST
     @Path("/users/{id}")
@@ -379,3 +379,10 @@ class UserResource(
             .data("error", status?.error)
      */
 }
+
+@Serializable
+data class UserDetails(
+    val userInfo: UserInfo,
+    val serverVersion: String?,
+    val tagId: UUID?,
+)

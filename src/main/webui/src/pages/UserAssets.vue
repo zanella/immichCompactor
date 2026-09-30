@@ -21,10 +21,9 @@ const user = ref<UserInfo | null>(null);
 
 onMounted(() => {
   userResourceApi
-    .apiUsersGet()
+    .apiUsersIdGet({ id: route.params.id as string })
     .then((res) => {
-      const id = Number(route.params.id);
-      user.value = res.data.find((u) => u.id === id) ?? null;
+      user.value = res.data.userInfo;
     });
 });
 </script>

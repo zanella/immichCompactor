@@ -13,18 +13,18 @@
     <div v-else>
       <div
         v-for="user in users"
-        :key="user.id"
+        :key="user._id ?? undefined"
         class="flex items-center gap-4 py-2 border-b border-gray-100"
       >
         <span>{{ user.name }}</span>
         <router-link
-          :to="`/users/${user.id}`"
+          :to="`/users/${user._id}`"
           class="px-4 py-1 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-colors"
         >
           Info
         </router-link>
         <router-link
-          :to="`/users/${user.id}/assets`"
+          :to="`/users/${user._id}/assets`"
           class="px-4 py-1 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-colors"
         >
           Assets

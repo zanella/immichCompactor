@@ -24,6 +24,8 @@ import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError
 // @ts-ignore
 import type { UserAddParams } from '../models';
 // @ts-ignore
+import type { UserDetails } from '../models';
+// @ts-ignore
 import type { UserInfo } from '../models';
 /**
  * UserResourceApi - axios parameter creator
@@ -38,6 +40,40 @@ export const UserResourceApiAxiosParamCreator = function (configuration?: Config
          */
         apiUsersGet: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/users`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary User Details
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdGet: async (id: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiUsersIdGet', 'id', id)
+            const localVarPath = `/api/users/{id}`
+                .replace('{id}', encodeURIComponent(String(id)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -117,6 +153,19 @@ export const UserResourceApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary User Details
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiUsersIdGet(id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserDetails>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiUsersIdGet(id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['UserResourceApi.apiUsersIdGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Upsert User
          * @param {UserAddParams} userAddParams 
          * @param {*} [options] Override http request option.
@@ -148,6 +197,16 @@ export const UserResourceApiFactory = function (configuration?: Configuration, b
         },
         /**
          * 
+         * @summary User Details
+         * @param {UserResourceApiApiUsersIdGetRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdGet(requestParameters: UserResourceApiApiUsersIdGetRequest, options?: RawAxiosRequestConfig): AxiosPromise<UserDetails> {
+            return localVarFp.apiUsersIdGet(requestParameters.id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Upsert User
          * @param {UserResourceApiApiUsersPostRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -158,6 +217,13 @@ export const UserResourceApiFactory = function (configuration?: Configuration, b
         },
     };
 };
+
+/**
+ * Request parameters for apiUsersIdGet operation in UserResourceApi.
+ */
+export interface UserResourceApiApiUsersIdGetRequest {
+    readonly id: string
+}
 
 /**
  * Request parameters for apiUsersPost operation in UserResourceApi.
@@ -178,6 +244,17 @@ export class UserResourceApi extends BaseAPI {
      */
     public apiUsersGet(options?: RawAxiosRequestConfig) {
         return UserResourceApiFp(this.configuration).apiUsersGet(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary User Details
+     * @param {UserResourceApiApiUsersIdGetRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiUsersIdGet(requestParameters: UserResourceApiApiUsersIdGetRequest, options?: RawAxiosRequestConfig) {
+        return UserResourceApiFp(this.configuration).apiUsersIdGet(requestParameters.id, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
