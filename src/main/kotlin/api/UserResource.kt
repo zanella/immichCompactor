@@ -1,14 +1,25 @@
 package api
 
 import database.AssetStagingAreaRepository
+import database.UserInfo
 import database.UserInfoRepository
+import database.getById
+import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.ws.rs.GET
+import jakarta.ws.rs.POST
 import jakarta.ws.rs.Path
 import jakarta.ws.rs.Produces
 import jakarta.ws.rs.core.MediaType.APPLICATION_JSON
 import services.AssetConversionService
 import services.AssetRefreshJobService
 import services.ImmichService
+
+data class UserAddParams(
+    val id: Int? = null,
+    val name: String,
+    val immichServerUrl: String,
+    val apiKey: String,
+)
 
 // TODO: clean it up :-), move logic to service
 @Path("/api/users")
@@ -42,15 +53,50 @@ class UserResource(
 ) {
     @GET
     @Produces(APPLICATION_JSON)
-    fun users() = userInfoRepository.listAll()
+    fun listUsers(): List<UserInfo> = userInfoRepository.listAll()
 
-    /* @GET
-    @Produces(MediaType.TEXT_HTML)
-    fun users(): TemplateInstance =
-        users
-            .instance()
-            .data("users", userInfoRepository.listAll())
+    @POST
+    @Produces(APPLICATION_JSON)
+    fun upsertUser(dto: UserAddParams): Unit =
+        with(dto) {
+            if (name.isBlank() || immichServerUrl.isBlank() || apiKey.isBlank()) {
+                throw IllegalStateException("All fields are required.")
+            }
 
+            // Validate the supplied API key against the supplied server, before touching the DB.
+            if (!apiKeyIsValid(immichServerUrl, apiKey)) {
+                throw IllegalStateException("Immich rejected this API key — the user was not saved.")
+            }
+
+            immichService.upsertTag(apiKey, immichService.instantiateClient(immichServerUrl))
+
+            // TODO: move to service
+            // Only now open a transaction to persist the change (flushed on commit).
+            QuarkusTransaction.requiringNew().run {
+                if (id == null) {
+                    userInfoRepository
+                        .persist(UserInfo(apiKey = apiKey, name = name, immichServerUrl = immichServerUrl))
+                } else {
+                    userInfoRepository.getById(id).also {
+                        it.name = name
+                        it.immichServerUrl = immichServerUrl
+                        it.apiKey = apiKey
+                    }
+                }
+            }
+        }
+
+    private fun apiKeyIsValid(
+        immichServerUrl: String,
+        apiKey: String,
+    ): Boolean =
+        runCatching {
+            immichService.instantiateClient(immichServerUrl).authValidateToken(apiKey).authStatus
+        }.getOrDefault(false)
+
+    // TemplateInstance = userFormData(userAdd.instance(), id = null, name = "", immichServerUrl = "", apiKey = "")
+
+    /*
     @GET
     @Path("/users/new")
     @Produces(MediaType.TEXT_HTML)
@@ -297,14 +343,6 @@ class UserResource(
             "<tr><td colspan=\"5\" class=\"py-2 px-3 text-red-600 text-xs\">Conversion failed: ${e.message}</td></tr>"
         }
     }
-
-    private fun apiKeyIsValid(
-        immichServerUrl: String,
-        apiKey: String,
-    ): Boolean =
-        runCatching {
-            immichService.instantiateClient(immichServerUrl).authValidateToken(apiKey).authStatus
-        }.getOrDefault(false)
 
     private fun userFormData(
         instance: TemplateInstance,
