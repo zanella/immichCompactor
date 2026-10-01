@@ -38,6 +38,7 @@ interface ImmichClient {
 
     // /////////////////////////////////////////////////////////////////////////
 
+    // https://api.immich.app/endpoints/search/searchAssets
     @POST
     @Path("/search/metadata")
     fun searchByMetadata(

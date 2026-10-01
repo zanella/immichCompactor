@@ -9,16 +9,25 @@ import java.util.UUID
 
 @Serializable
 data class SearchAssetsRequest(
-    val city: String? = null,
-    val country: String? = null,
-    val createdAfter: String? = null, // Formatted as ISO 8601 string
-    val isFavorite: Boolean? = null,
-    val isOffline: Boolean? = null,
-    val make: String? = null,
-    val model: String? = null,
-    val withExif: Boolean? = null,
-    val page: Int? = null,
-)
+    val cursor: String? = null, // // Since 3.2.0
+    val filter: SearchFilter? = null, // Since 3.2.0
+) {
+    companion object {
+        @Serializable
+        data class SearchFilter(
+            val tagIds: IdsFilter,
+        ) {
+            companion object {
+                @Serializable
+                data class IdsFilter(
+                    val all: List<UUID>? = null,
+                    val any: List<UUID>? = null,
+                    val none: List<UUID>? = null,
+                )
+            }
+        }
+    }
+}
 
 @Serializable
 data class SearchAssetsResponse(
@@ -32,7 +41,7 @@ data class SearchAssetResponseDto(
     val count: Int,
     // val facets
     val items: List<AssetResponseDto>,
-    val nextPage: String? = null,
+    val nextCursor: String? = null,
     val total: Int,
 )
 

@@ -4,6 +4,7 @@ class Main {
     /*
      * TODO Not easy to fix:
      *  - The user needs to delete all assets from device, otherwise the Immich app will upload them again
+     *  -- Or: turn ON Advanced :: Sync Remote deletions
      *
      * TODO Gradle:
      *  - Compile with GraalVM

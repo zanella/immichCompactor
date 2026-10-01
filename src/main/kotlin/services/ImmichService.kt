@@ -12,6 +12,8 @@ import integration.immich.IMMICH_COMPACTOR_TAG_NAME
 import integration.immich.ImmichClient
 import integration.immich.ImmichLoggingFilter
 import integration.immich.SearchAssetsRequest
+import integration.immich.SearchAssetsRequest.Companion.SearchFilter
+import integration.immich.SearchAssetsRequest.Companion.SearchFilter.Companion.IdsFilter
 import integration.immich.SearchAssetsResponse
 import integration.immich.TagResponseDto
 import io.quarkus.narayana.jta.QuarkusTransaction
@@ -24,7 +26,6 @@ import java.io.InputStream
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import java.time.Instant
 import java.util.UUID
 
 @ApplicationScoped
@@ -37,7 +38,7 @@ class ImmichService(
      */
     fun instantiateClient(
         baseUrl: String,
-        isDebug: Boolean = false,
+        isDebug: Boolean = true,
     ): ImmichClient =
         RestClientBuilder
             .newBuilder()
@@ -73,12 +74,19 @@ class ImmichService(
     fun findAllAssets(
         apiKey: String,
         client: ImmichClient,
-        page: Int = 1,
+        tagId: UUID,
+        cursor: String? = null,
     ): SearchAssetsResponse {
         val searchCriteria =
             SearchAssetsRequest(
-                createdAfter = Instant.EPOCH.toString(),
-                page = page,
+                filter =
+                    SearchFilter(
+                        tagIds =
+                            IdsFilter(
+                                none = listOf(tagId),
+                            ),
+                    ),
+                cursor = cursor,
             )
 
         return client.searchByMetadata(apiKey, searchCriteria)
@@ -126,10 +134,13 @@ class ImmichService(
 
         var assetsFound = 0L
         var assetsQueued = 0L
-        var page: Int? = 1
+        var nextCursor: String? = null
 
-        while (page != null) {
-            val searchAssetsResponse = findAllAssets(apiKey, client, page).assets
+        // TODO: add this to the userInfo, and fetch once
+        val tagId = upsertTag(apiKey, client).id
+
+        do {
+            val searchAssetsResponse = findAllAssets(apiKey, client, tagId, nextCursor).assets
 
             val assetsToBeStaged =
                 searchAssetsResponse.items
@@ -170,8 +181,8 @@ class ImmichService(
             assetsFound += searchAssetsResponse.items.size
             assetsQueued += assetsToBeStaged.size
 
-            page = searchAssetsResponse.nextPage?.toInt()
-        }
+            nextCursor = searchAssetsResponse.nextCursor
+        } while (nextCursor != null)
 
         return FindAndEnqueueAllAssetsResponse(assetsFound = assetsFound, assetsQueued = assetsQueued)
     }

@@ -21,7 +21,7 @@
     </div>
     <div v-else-if="showStatus && refreshStatus?.state === 'DONE'"
          class="mt-4 mb-6 px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm">
-      Found {{ refreshStatus.assetsFound }} asset(s); queued {{ refreshStatus.assetsQueued }} new one(s) for conversion.
+      Found {{ refreshStatus.assetsFound ?? 0 }} asset(s); queued {{ refreshStatus.assetsQueued ?? 0 }} new one(s) for conversion.
     </div>
     <div v-else-if="showStatus && refreshStatus?.state === 'FAILED'"
          class="mt-4 mb-6 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
@@ -214,14 +214,18 @@ function fetchStatus() {
     .apiUsersIdAssetsStatusGet({ id: userId })
     .then((res) => {
       refreshStatus.value = res.data;
-      if (res.data.state === 'RUNNING' && !pollTimer) {
+      if (res.data.state === 'RUNNING') {
         showStatus.value = true;
         triggerInFlight.value = false;
-        pollTimer = setInterval(fetchStatus, 2000);
-      } else if (res.data.state !== 'RUNNING' && pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
+        if (!pollTimer) {
+          pollTimer = setInterval(fetchStatus, 2000);
+        }
+      } else {
         triggerInFlight.value = false;
+        if (pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
         fetchQueued();
       }
     });
@@ -245,7 +249,10 @@ function triggerRefresh() {
   showStatus.value = true;
   userResourceApi
     .apiUsersIdAssetsRefreshPost({ id: userId })
-    .then(() => fetchStatus());
+    .then(() => fetchStatus())
+    .finally(() => {
+      triggerInFlight.value = false;
+    });
 }
 
 function onPageSizeChange(e: Event) {
