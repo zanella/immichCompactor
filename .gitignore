@@ -60,7 +60,9 @@ bin/
 ##################################################################
 
 src/main/webui/.editorconfig
+src/main/webui/.eslintcache
 src/main/webui/.gitattributes
 src/main/webui/.gitignore
 src/main/webui/node_modules
 src/main/webui/openapi.json
+src/main/webui/openapi.yaml

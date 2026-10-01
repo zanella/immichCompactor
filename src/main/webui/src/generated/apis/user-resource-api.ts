@@ -22,6 +22,12 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
+import type { ConvertResultResponse } from '../models';
+// @ts-ignore
+import type { JobStatus } from '../models';
+// @ts-ignore
+import type { QueuedAssetsResponse } from '../models';
+// @ts-ignore
 import type { UserAddParams } from '../models';
 // @ts-ignore
 import type { UserDetails } from '../models';
@@ -40,6 +46,165 @@ export const UserResourceApiAxiosParamCreator = function (configuration?: Config
          */
         apiUsersGet: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/users`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Convert Asset
+         * @param {string} assetId 
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdAssetsAssetIdConvertPost: async (assetId: string, id: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'assetId' is not null or undefined
+            assertParamExists('apiUsersIdAssetsAssetIdConvertPost', 'assetId', assetId)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiUsersIdAssetsAssetIdConvertPost', 'id', id)
+            const localVarPath = `/api/users/{id}/assets/{assetId}/convert`
+                .replace('{assetId}', encodeURIComponent(String(assetId)))
+                .replace('{id}', encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Queued Assets
+         * @param {string} id 
+         * @param {number} page 
+         * @param {number} size 
+         * @param {Array<string> | null} [contentTypes] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdAssetsQueuedGet: async (id: string, page: number, size: number, contentTypes?: Array<string> | null, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiUsersIdAssetsQueuedGet', 'id', id)
+            // verify required parameter 'page' is not null or undefined
+            assertParamExists('apiUsersIdAssetsQueuedGet', 'page', page)
+            // verify required parameter 'size' is not null or undefined
+            assertParamExists('apiUsersIdAssetsQueuedGet', 'size', size)
+            const localVarPath = `/api/users/{id}/assets/queued`
+                .replace('{id}', encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (contentTypes) {
+                localVarQueryParameter['contentTypes'] = contentTypes;
+            }
+
+            if (page !== undefined) {
+                localVarQueryParameter['page'] = page;
+            }
+
+            if (size !== undefined) {
+                localVarQueryParameter['size'] = size;
+            }
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Refresh Assets
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdAssetsRefreshPost: async (id: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiUsersIdAssetsRefreshPost', 'id', id)
+            const localVarPath = `/api/users/{id}/assets/refresh`
+                .replace('{id}', encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Refresh Status
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdAssetsStatusGet: async (id: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiUsersIdAssetsStatusGet', 'id', id)
+            const localVarPath = `/api/users/{id}/assets/status`
+                .replace('{id}', encodeURIComponent(String(id)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -153,6 +318,62 @@ export const UserResourceApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Convert Asset
+         * @param {string} assetId 
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiUsersIdAssetsAssetIdConvertPost(assetId: string, id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ConvertResultResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiUsersIdAssetsAssetIdConvertPost(assetId, id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['UserResourceApi.apiUsersIdAssetsAssetIdConvertPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Queued Assets
+         * @param {string} id 
+         * @param {number} page 
+         * @param {number} size 
+         * @param {Array<string> | null} [contentTypes] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiUsersIdAssetsQueuedGet(id: string, page: number, size: number, contentTypes?: Array<string> | null, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<QueuedAssetsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiUsersIdAssetsQueuedGet(id, page, size, contentTypes, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['UserResourceApi.apiUsersIdAssetsQueuedGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Refresh Assets
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiUsersIdAssetsRefreshPost(id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<JobStatus>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiUsersIdAssetsRefreshPost(id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['UserResourceApi.apiUsersIdAssetsRefreshPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Refresh Status
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiUsersIdAssetsStatusGet(id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<JobStatus>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiUsersIdAssetsStatusGet(id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['UserResourceApi.apiUsersIdAssetsStatusGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary User Details
          * @param {string} id 
          * @param {*} [options] Override http request option.
@@ -197,6 +418,46 @@ export const UserResourceApiFactory = function (configuration?: Configuration, b
         },
         /**
          * 
+         * @summary Convert Asset
+         * @param {UserResourceApiApiUsersIdAssetsAssetIdConvertPostRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdAssetsAssetIdConvertPost(requestParameters: UserResourceApiApiUsersIdAssetsAssetIdConvertPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<ConvertResultResponse> {
+            return localVarFp.apiUsersIdAssetsAssetIdConvertPost(requestParameters.assetId, requestParameters.id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Queued Assets
+         * @param {UserResourceApiApiUsersIdAssetsQueuedGetRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdAssetsQueuedGet(requestParameters: UserResourceApiApiUsersIdAssetsQueuedGetRequest, options?: RawAxiosRequestConfig): AxiosPromise<QueuedAssetsResponse> {
+            return localVarFp.apiUsersIdAssetsQueuedGet(requestParameters.id, requestParameters.page, requestParameters.size, requestParameters.contentTypes, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Refresh Assets
+         * @param {UserResourceApiApiUsersIdAssetsRefreshPostRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdAssetsRefreshPost(requestParameters: UserResourceApiApiUsersIdAssetsRefreshPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<JobStatus> {
+            return localVarFp.apiUsersIdAssetsRefreshPost(requestParameters.id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Refresh Status
+         * @param {UserResourceApiApiUsersIdAssetsStatusGetRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdAssetsStatusGet(requestParameters: UserResourceApiApiUsersIdAssetsStatusGetRequest, options?: RawAxiosRequestConfig): AxiosPromise<JobStatus> {
+            return localVarFp.apiUsersIdAssetsStatusGet(requestParameters.id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary User Details
          * @param {UserResourceApiApiUsersIdGetRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
@@ -217,6 +478,42 @@ export const UserResourceApiFactory = function (configuration?: Configuration, b
         },
     };
 };
+
+/**
+ * Request parameters for apiUsersIdAssetsAssetIdConvertPost operation in UserResourceApi.
+ */
+export interface UserResourceApiApiUsersIdAssetsAssetIdConvertPostRequest {
+    readonly assetId: string
+
+    readonly id: string
+}
+
+/**
+ * Request parameters for apiUsersIdAssetsQueuedGet operation in UserResourceApi.
+ */
+export interface UserResourceApiApiUsersIdAssetsQueuedGetRequest {
+    readonly id: string
+
+    readonly page: number
+
+    readonly size: number
+
+    readonly contentTypes?: Array<string> | null
+}
+
+/**
+ * Request parameters for apiUsersIdAssetsRefreshPost operation in UserResourceApi.
+ */
+export interface UserResourceApiApiUsersIdAssetsRefreshPostRequest {
+    readonly id: string
+}
+
+/**
+ * Request parameters for apiUsersIdAssetsStatusGet operation in UserResourceApi.
+ */
+export interface UserResourceApiApiUsersIdAssetsStatusGetRequest {
+    readonly id: string
+}
 
 /**
  * Request parameters for apiUsersIdGet operation in UserResourceApi.
@@ -244,6 +541,50 @@ export class UserResourceApi extends BaseAPI {
      */
     public apiUsersGet(options?: RawAxiosRequestConfig) {
         return UserResourceApiFp(this.configuration).apiUsersGet(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Convert Asset
+     * @param {UserResourceApiApiUsersIdAssetsAssetIdConvertPostRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiUsersIdAssetsAssetIdConvertPost(requestParameters: UserResourceApiApiUsersIdAssetsAssetIdConvertPostRequest, options?: RawAxiosRequestConfig) {
+        return UserResourceApiFp(this.configuration).apiUsersIdAssetsAssetIdConvertPost(requestParameters.assetId, requestParameters.id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Queued Assets
+     * @param {UserResourceApiApiUsersIdAssetsQueuedGetRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiUsersIdAssetsQueuedGet(requestParameters: UserResourceApiApiUsersIdAssetsQueuedGetRequest, options?: RawAxiosRequestConfig) {
+        return UserResourceApiFp(this.configuration).apiUsersIdAssetsQueuedGet(requestParameters.id, requestParameters.page, requestParameters.size, requestParameters.contentTypes, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Refresh Assets
+     * @param {UserResourceApiApiUsersIdAssetsRefreshPostRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiUsersIdAssetsRefreshPost(requestParameters: UserResourceApiApiUsersIdAssetsRefreshPostRequest, options?: RawAxiosRequestConfig) {
+        return UserResourceApiFp(this.configuration).apiUsersIdAssetsRefreshPost(requestParameters.id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Refresh Status
+     * @param {UserResourceApiApiUsersIdAssetsStatusGetRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiUsersIdAssetsStatusGet(requestParameters: UserResourceApiApiUsersIdAssetsStatusGetRequest, options?: RawAxiosRequestConfig) {
+        return UserResourceApiFp(this.configuration).apiUsersIdAssetsStatusGet(requestParameters.id, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

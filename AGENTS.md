@@ -1,0 +1,2 @@
+- NEVER create DTOs just because, ASK first.
+- Code should be written to be read by humans, don't cram it all together.

@@ -2,6 +2,122 @@
 openapi: 3.1.0
 components:
   schemas:
+    ConvertResultResponse:
+      type: object
+      required:
+      - status
+      - newAssetId
+      - immichServerUrl
+      - error
+      properties:
+        status:
+          type: string
+        newAssetId:
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
+        immichServerUrl:
+          type:
+          - string
+          - "null"
+        error:
+          type:
+          - string
+          - "null"
+    Instant:
+      type: object
+      required:
+      - epochSeconds
+      - nanosecondsOfSecond
+      properties:
+        epochSeconds:
+          type: integer
+          format: int64
+        nanosecondsOfSecond:
+          type: integer
+          format: int32
+    JobStatus:
+      type: object
+      required:
+      - threadId
+      - state
+      properties:
+        threadId:
+          type: integer
+          format: int64
+        state:
+          $ref: "#/components/schemas/State"
+        assetsFound:
+          type: integer
+          format: int64
+        assetsQueued:
+          type: integer
+          format: int64
+        error:
+          type:
+          - string
+          - "null"
+        startedAt:
+          $ref: "#/components/schemas/Instant"
+        endedAt:
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+    QueuedAssetsResponse:
+      type: object
+      required:
+      - assets
+      - page
+      - size
+      - total
+      - pageCount
+      - hasPrev
+      - hasNext
+      - contentTypes
+      properties:
+        assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/StagedAssetDto"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+        pageCount:
+          type: integer
+          format: int32
+        hasPrev:
+          type: boolean
+        hasNext:
+          type: boolean
+        contentTypes:
+          type: array
+          items:
+            type: string
+    StagedAssetDto:
+      type: object
+      required:
+      - assetId
+      - contentType
+      - currentState
+      properties:
+        assetId:
+          $ref: "#/components/schemas/UUID"
+        contentType:
+          type: string
+        currentState:
+          type: string
+    State:
+      type: string
+      enum:
+      - RUNNING
+      - DONE
+      - FAILED
     UUID:
       type: string
       format: uuid
@@ -108,6 +224,106 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserDetails"
       summary: User Details
+      tags:
+      - User Resource
+  /api/users/{id}/assets/queued:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - required: false
+        name: contentTypes
+        in: query
+        schema:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 1
+        required: true
+      - name: size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 50
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedAssetsResponse"
+      summary: Queued Assets
+      tags:
+      - User Resource
+  /api/users/{id}/assets/refresh:
+    post:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatus"
+      summary: Refresh Assets
+      tags:
+      - User Resource
+  /api/users/{id}/assets/status:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatus"
+      summary: Refresh Status
+      tags:
+      - User Resource
+  /api/users/{id}/assets/{assetId}/convert:
+    post:
+      parameters:
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConvertResultResponse"
+      summary: Convert Asset
       tags:
       - User Resource
 info:

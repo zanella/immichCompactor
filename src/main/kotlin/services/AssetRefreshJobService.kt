@@ -4,6 +4,7 @@ import database.UserId
 import internal.lang.getOrElseException
 import internal.lang.runCatchingSafely
 import jakarta.inject.Singleton
+import kotlinx.serialization.Serializable
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -19,6 +20,7 @@ class AssetRefreshJobService(
 ) {
     enum class State { RUNNING, DONE, FAILED }
 
+    @Serializable
     data class JobStatus(
         val threadId: Long,
         val state: State,
@@ -45,7 +47,7 @@ class AssetRefreshJobService(
         userId: UserId,
         apiKey: String,
         immichServerUrl: String,
-    ) {
+    ): JobStatus {
         jobs[userId].also { lastKnownJob ->
             if (lastKnownJob == null) {
                 return@also
@@ -56,7 +58,7 @@ class AssetRefreshJobService(
             }
         }
 
-        jobs.getOrPut(userId) {
+        return jobs.getOrPut(userId) {
             val t = Thread.ofVirtual().unstarted { runRefresh(userId, apiKey, immichServerUrl) }
 
             JobStatus(threadId = t.threadId(), State.RUNNING, 0).also { t.start() }

@@ -46,11 +46,7 @@ function onSubmit() {
   submitting.value = true;
   userResourceApi
     .apiUsersPost({ userAddParams: { ...form } })
-    .then(() => {
-      saved.value = true;
-    })
-    .finally(() => {
-      submitting.value = false;
-    });
+    .then(() => saved.value = true)
+    .finally(() => submitting.value = false);
 }
 </script>
