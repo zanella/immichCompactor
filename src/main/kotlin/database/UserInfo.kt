@@ -31,9 +31,8 @@ data class UserInfo(
     @Column(name = "id")
     private var _id: Int? = null
 
-    // TODO: return value class
-    val id: Int
-        get() = _id ?: throw IllegalStateException("Entity is not persisted yet")
+    val id: UserId
+        get() = _id?.let(::UserId) ?: throw IllegalStateException("Entity is not persisted yet")
 }
 
 @ApplicationScoped

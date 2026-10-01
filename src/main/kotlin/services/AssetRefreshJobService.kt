@@ -1,6 +1,7 @@
 package services
 
 import database.UserId
+import database.UserInfo
 import internal.lang.getOrElseException
 import internal.lang.runCatchingSafely
 import jakarta.inject.Singleton
@@ -33,37 +34,35 @@ class AssetRefreshJobService(
         val endedAt: Instant? = null,
     )
 
+    // TODO: do this properly
     // userId -> latest status. One entry per user; overwritten on each new job.
     private val jobs = ConcurrentHashMap<UserId, JobStatus>()
 
     fun status(userId: UserId): JobStatus? = jobs[userId]
 
     /**
-     * Launches a refresh for [userId] unless one is already running; returns true if a new
+     * Launches a refresh for [UserId] unless one is already running; returns true if a new
      * job was started. The RUNNING flag is checked atomically so concurrent calls can't
      * spawn duplicate jobs.
      */
-    fun start(
-        userId: UserId,
-        apiKey: String,
-        immichServerUrl: String,
-    ): JobStatus {
-        jobs[userId].also { lastKnownJob ->
-            if (lastKnownJob == null) {
-                return@also
+    fun start(userInfo: UserInfo): JobStatus =
+        with(userInfo) {
+            jobs[id].also { lastKnownJob ->
+                if (lastKnownJob == null) {
+                    return@also
+                }
+
+                if (lastKnownJob.state == State.DONE) {
+                    jobs.remove(id)
+                }
             }
 
-            if (lastKnownJob.state == State.DONE) {
-                jobs.remove(userId)
+            return jobs.getOrPut(id) {
+                val t = Thread.ofVirtual().unstarted { runRefresh(id, apiKey, immichServerUrl) }
+
+                JobStatus(threadId = t.threadId(), State.RUNNING, 0).also { t.start() }
             }
         }
-
-        return jobs.getOrPut(userId) {
-            val t = Thread.ofVirtual().unstarted { runRefresh(userId, apiKey, immichServerUrl) }
-
-            JobStatus(threadId = t.threadId(), State.RUNNING, 0).also { t.start() }
-        }
-    }
 
     private fun runRefresh(
         userId: UserId,

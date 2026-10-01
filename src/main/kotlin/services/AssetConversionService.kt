@@ -5,7 +5,6 @@ import database.AssetStagingAreaRepository
 import database.ConvertedAsset
 import database.ConvertedAssetStates
 import database.ConvertedAssetsRepository
-import database.UserId
 import database.UserInfo
 import database.getById
 import integration.immich.AssetMediaStatus
@@ -153,7 +152,7 @@ class AssetConversionService(
             // Replacement: Save state
             val replacementEntity =
                 ConvertedAsset(
-                    userId = UserId(userInfo.id),
+                    userId = userInfo.id,
                     assetId = uploadResponse.id,
                     currentState = ConvertedAssetStates.UPLOADED,
                 ).also(convertedAssetsRepository::store)

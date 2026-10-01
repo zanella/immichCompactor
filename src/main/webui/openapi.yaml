@@ -150,13 +150,19 @@ components:
         userInfo:
           $ref: "#/components/schemas/UserInfo"
         serverVersion:
-          type:
-          - string
-          - "null"
+          type: string
         tagId:
           anyOf:
           - $ref: "#/components/schemas/UUID"
           - type: "null"
+    UserId:
+      type: object
+      required:
+      - value
+      properties:
+        value:
+          type: integer
+          format: int32
     UserInfo:
       type: object
       required:
@@ -176,8 +182,7 @@ components:
           - "null"
           format: int32
         id:
-          type: integer
-          format: int32
+          $ref: "#/components/schemas/UserId"
 paths:
   /api/users:
     post:

@@ -8,7 +8,6 @@ import database.UserInfo
 import database.UserInfoRepository
 import database.getById
 import internal.serdes.UUIDSerializer
-import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.ws.rs.DefaultValue
 import jakarta.ws.rs.GET
 import jakarta.ws.rs.POST
@@ -24,6 +23,9 @@ import services.AssetConversionService
 import services.AssetRefreshJobService
 import services.ContentType
 import services.ImmichService
+import services.UserDetails
+import services.UserInfoService
+import services.UserInfoService.Companion.UserAddParams
 import java.util.UUID
 
 // TODO: clean it up :-), move logic to service
@@ -34,85 +36,40 @@ class UserResource(
     private val assetStagingAreaRepository: AssetStagingAreaRepository,
     private val immichService: ImmichService,
     private val userInfoRepository: UserInfoRepository,
+    private val userInfoService: UserInfoService,
 ) {
     @GET
     @Produces(APPLICATION_JSON)
-    fun listUsers(): List<UserInfo> = userInfoRepository.listAll()
-
-    data class UserAddParams(
-        val id: Int? = null,
-        val name: String,
-        val immichServerUrl: String,
-        val apiKey: String,
-    )
+    fun listUsers(): List<UserInfo> = userInfoService.listUsers()
 
     @POST
     @Produces(APPLICATION_JSON)
-    fun upsertUser(dto: UserAddParams): Unit =
-        with(dto) {
-            if (name.isBlank() || immichServerUrl.isBlank() || apiKey.isBlank()) {
-                throw IllegalStateException("All fields are required.")
-            }
-
-            // Validate the supplied API key against the supplied server, before touching the DB.
-            if (!apiKeyIsValid(immichServerUrl, apiKey)) {
-                throw IllegalStateException("Immich rejected this API key — the user was not saved.")
-            }
-
-            immichService.upsertTag(apiKey, immichService.instantiateClient(immichServerUrl))
-
-            // TODO: move to service
-            // Only now open a transaction to persist the change (flushed on commit).
-            QuarkusTransaction.requiringNew().run {
-                if (id == null) {
-                    userInfoRepository
-                        .persist(UserInfo(apiKey = apiKey, name = name, immichServerUrl = immichServerUrl))
-                } else {
-                    userInfoRepository.getById(id).also {
-                        it.name = name
-                        it.immichServerUrl = immichServerUrl
-                        it.apiKey = apiKey
-                    }
-                }
-            }
-        }
+    fun upsertUser(dto: UserAddParams): Unit = userInfoService.upsertUser(dto)
 
     @GET
     @Path("/{id}")
     @Produces(APPLICATION_JSON)
     fun userDetails(
         @PathParam("id") rawUserId: String,
-    ): UserDetails =
-        userInfoRepository.getById(UserId(rawUserId.toInt()).value).let { user ->
-            // TODO: check it's >= 2
-            val client = immichService.instantiateClient(user.immichServerUrl)
-
-            UserDetails(
-                user,
-                runCatching { client.serverAbout(user.apiKey).version }.getOrNull(),
-                runCatching { immichService.upsertTag(user.apiKey, client).id }.getOrNull(),
-            )
-        }
+    ): UserDetails = UserId(rawUserId.toInt()).let(userInfoService::userDetails)
 
     @GET
     @Path("/{id}/assets/status")
     @Produces(APPLICATION_JSON)
     fun refreshStatus(
         @PathParam("id") rawUserId: String,
-    ): AssetRefreshJobService.JobStatus? = assetRefreshJobService.status(UserId(rawUserId.toInt()))
+    ): AssetRefreshJobService.JobStatus? = UserId(rawUserId.toInt()).let(assetRefreshJobService::status)
 
     @POST
     @Path("/{id}/assets/refresh")
     @Produces(APPLICATION_JSON)
     fun refreshAssets(
         @PathParam("id") rawUserId: String,
-    ): AssetRefreshJobService.JobStatus {
-        val id = UserId(rawUserId.toInt())
-
-        val user = userInfoRepository.getById(id.value)
-
-        return assetRefreshJobService.start(id, user.apiKey, user.immichServerUrl)
-    }
+    ): AssetRefreshJobService.JobStatus =
+        UserId(rawUserId.toInt())
+            .let(userInfoService::userDetails)
+            .userInfo
+            .let(assetRefreshJobService::start)
 
     @GET
     @Path("/{id}/assets/queued")
@@ -185,22 +142,7 @@ class UserResource(
             ConvertResultResponse(status = "error", newAssetId = null, immichServerUrl = null, error = e.message)
         }
     }
-
-    private fun apiKeyIsValid(
-        immichServerUrl: String,
-        apiKey: String,
-    ): Boolean =
-        runCatching {
-            immichService.instantiateClient(immichServerUrl).authValidateToken(apiKey).authStatus
-        }.getOrDefault(false)
 }
-
-@Serializable
-data class UserDetails(
-    val userInfo: UserInfo,
-    val serverVersion: String?,
-    val tagId: UUID?,
-)
 
 @Serializable
 data class StagedAssetDto(
