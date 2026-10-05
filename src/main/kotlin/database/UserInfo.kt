@@ -1,5 +1,8 @@
+@file:UseSerializers(UUIDSerializer::class)
+
 package database
 
+import internal.serdes.UUIDSerializer
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntityBase
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepositoryBase
 import io.quarkus.runtime.annotations.RegisterForReflection
@@ -12,7 +15,10 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.LockModeType
 import jakarta.persistence.Table
+import jakarta.persistence.Transient
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
+import java.util.UUID
 
 @Entity
 @Table(name = "user_info")
@@ -25,14 +31,21 @@ data class UserInfo(
     var name: String,
     @Column("immich_server_url")
     var immichServerUrl: String,
+    @Column("tag_uuid")
+    private val _tagUUID: String,
 ) : PanacheEntityBase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private var _id: Int? = null
 
+    @get:Transient
     val id: UserId
         get() = _id?.let(::UserId) ?: throw IllegalStateException("Entity is not persisted yet")
+
+    @get:Transient
+    val tagId: UUID
+        get() = UUID.fromString(_tagUUID)
 }
 
 @ApplicationScoped

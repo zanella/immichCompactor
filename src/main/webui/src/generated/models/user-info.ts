@@ -13,12 +13,17 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { UserId } from './user-id';
 
 export interface UserInfo {
     'apiKey': string;
     'name': string;
     'immichServerUrl': string;
+    '_tagUUID': string;
     '_id'?: number | null;
-    'id'?: number;
+    'tagId'?: string;
+    'id'?: UserId;
 }
 

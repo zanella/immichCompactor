@@ -19,7 +19,6 @@ import type { UserInfo } from './user-info';
 
 export interface UserDetails {
     'userInfo': UserInfo;
-    'serverVersion': string | null;
-    'tagId': string | null;
+    'serverVersion': string;
 }
 

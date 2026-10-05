@@ -6,4 +6,5 @@ export * from './staged-asset-dto';
 export * from './state';
 export * from './user-add-params';
 export * from './user-details';
+export * from './user-id';
 export * from './user-info';

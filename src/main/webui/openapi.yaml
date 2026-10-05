@@ -145,16 +145,11 @@ components:
       required:
       - userInfo
       - serverVersion
-      - tagId
       properties:
         userInfo:
           $ref: "#/components/schemas/UserInfo"
         serverVersion:
           type: string
-        tagId:
-          anyOf:
-          - $ref: "#/components/schemas/UUID"
-          - type: "null"
     UserId:
       type: object
       required:
@@ -169,12 +164,15 @@ components:
       - apiKey
       - name
       - immichServerUrl
+      - _tagUUID
       properties:
         apiKey:
           type: string
         name:
           type: string
         immichServerUrl:
+          type: string
+        _tagUUID:
           type: string
         _id:
           type:
@@ -183,6 +181,8 @@ components:
           format: int32
         id:
           $ref: "#/components/schemas/UserId"
+        tagId:
+          $ref: "#/components/schemas/UUID"
 paths:
   /api/users:
     post:

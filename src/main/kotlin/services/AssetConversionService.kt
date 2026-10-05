@@ -58,9 +58,6 @@ class AssetConversionService(
         val deferredListOfFilesToDelete = mutableListOf<File?>()
 
         try {
-            // TODO: do this once, save the tagId on a global by lazy
-            val tagId = immichService.upsertTag(userInfo.apiKey, client).id
-
             val tmpDir =
                 Files
                     .createTempDirectory("immich-upload-")
@@ -174,7 +171,7 @@ class AssetConversionService(
             client
                 .bulkTagAssets(
                     userInfo.apiKey,
-                    BulkTagAssetsDto(assetIds = listOf(uploadResponse.id), tagIds = listOf(tagId)),
+                    BulkTagAssetsDto(assetIds = listOf(uploadResponse.id), tagIds = listOf(userInfo.tagId)),
                 ).also {
                     require(it.count == 1) { "Immich didn't tag the new asset ${uploadResponse.id}" }
                 }

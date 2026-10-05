@@ -16,9 +16,9 @@
         </div>
         <div>
           <span class="text-gray-500">Immich Compactor tag ID:</span>
-          <span v-if="details.tagId"
+          <span v-if="details.userInfo.tagId"
                 class="ml-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 font-mono font-semibold rounded">
-            {{ details.tagId }}
+            {{ details.userInfo.tagId }}
           </span>
           <span v-else class="ml-1 px-2 py-0.5 bg-gray-100 text-gray-500 font-mono rounded">unavailable</span>
         </div>
