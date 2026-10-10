@@ -6,9 +6,6 @@ components:
       type: object
       required:
       - status
-      - newAssetId
-      - immichServerUrl
-      - error
       properties:
         status:
           type: string

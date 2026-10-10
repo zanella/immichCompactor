@@ -2,6 +2,9 @@
 
 package services
 
+import api.QueuedAssetsResponse
+import api.StagedAssetDto
+import database.AssetStagingAreaRepository
 import database.UserId
 import database.UserInfo
 import database.UserInfoRepository
@@ -17,6 +20,7 @@ import kotlinx.serialization.UseSerializers
 
 @ApplicationScoped
 class UserInfoService(
+    private val assetStagingAreaRepository: AssetStagingAreaRepository,
     private val immichService: ImmichService,
     private val userInfoRepository: UserInfoRepository,
 ) {
@@ -85,6 +89,44 @@ class UserInfoService(
                 }
             }
         }
+
+    fun userQueuedAssets(
+        id: UserId,
+        page: Int,
+        size: Int,
+        contentTypes: List<String>?,
+    ): QueuedAssetsResponse {
+        val safePage = page.coerceAtLeast(1)
+
+        val safeSize = size.coerceIn(1, 1000)
+
+        val pageIndex = safePage - 1
+
+        val selectedContentTypes =
+            contentTypes
+                ?.mapNotNull { runCatching { ContentType.valueOf(it) }.getOrNull() }
+                ?.minus(ContentType.UNHANDLED)
+                ?: emptyList()
+
+        val items =
+            assetStagingAreaRepository
+                .findQueuedByUserId(id, pageIndex, safeSize, selectedContentTypes)
+
+        val total = assetStagingAreaRepository.countQueuedByUserId(id, selectedContentTypes)
+
+        val pageCount = ((total + safeSize - 1) / safeSize).toInt().coerceAtLeast(1)
+
+        return QueuedAssetsResponse(
+            assets = items.map { StagedAssetDto(it.assetId, it.contentType.name, it.currentState.name) },
+            page = safePage,
+            size = safeSize,
+            total = total,
+            pageCount = pageCount,
+            hasPrev = safePage > 1,
+            hasNext = safePage < pageCount,
+            contentTypes = ContentType.entries.filter { it != ContentType.UNHANDLED }.map { it.name },
+        )
+    }
 
     // ////////////////////////////
 

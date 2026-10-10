@@ -10,7 +10,11 @@ import jakarta.persistence.Converter
  */
 data class UserId(
     val value: Int,
-)
+) {
+    companion object {
+        fun from(s: String): UserId = UserId(s.toInt())
+    }
+}
 
 @Converter(autoApply = true)
 class UserIdConverter : AttributeConverter<UserId, Int> {

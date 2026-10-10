@@ -27,3 +27,13 @@ inline fun <R, T : R> Result<T>.getOrElseException(onFailure: (exception: Except
         !is Exception -> throw throwable // Rethrow fatal JVM Errors!
         else -> onFailure(throwable) // Pass safe Exceptions to your block
     }
+
+sealed class CustomEither<out L, out R> {
+    data class Left<out L>(
+        val value: L,
+    ) : CustomEither<L, Nothing>()
+
+    data class Right<out R>(
+        val value: R,
+    ) : CustomEither<Nothing, R>()
+}

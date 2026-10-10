@@ -2,6 +2,8 @@
 
 class Main {
     /*
+     * TODO:
+     *  - Turn off the tag feature, does it still work ?
      * TODO Not easy to fix:
      *  - The user needs to delete all assets from device, otherwise the Immich app will upload them again
      *  -- Or: turn ON Advanced :: Sync Remote deletions
@@ -17,7 +19,6 @@ class Main {
      *  - fetch asset list -> delete one asset -> try to convert it -> ... why ?
      *
      * TODO:
-     *  - Can the query sent to Immich already exclude the tagged entries ?
      *  - Ensure only one conversion request is handled at a time: mutex
      *  - handle assets left in between
      *  - When an asset is deemed not "improvable" (the size ends up being larger than original), the UI shows
