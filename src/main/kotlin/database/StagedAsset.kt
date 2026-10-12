@@ -15,6 +15,8 @@ import org.hibernate.type.SqlTypes
 import services.ContentType
 import java.util.UUID
 
+typealias AssetId = UUID
+
 @Entity
 @Table(name = "assets_staging_area")
 data class StagedAsset(
@@ -23,18 +25,25 @@ data class StagedAsset(
     @Id
     @Column(name = "asset_id")
     @JdbcTypeCode(SqlTypes.VARCHAR)
-    val assetId: UUID,
+    val assetId: AssetId,
     @Column(name = "content_type")
     @Enumerated(EnumType.STRING)
     val contentType: ContentType,
     @Column("current_state")
     @Enumerated(EnumType.STRING)
-    var currentState: AssetConversionStates,
+    var currentState: AssetConversionState,
+    @Column("replacement_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    var replacementId: AssetId? = null,
 ) : PanacheEntityBase
 
-enum class AssetConversionStates {
+enum class AssetConversionState {
     QUEUED,
+    REPLACEMENT_HAS_BEEN_UPLOADED,
+    REPLACEMENT_HAS_BEEN_UPDATED_WITH_METADATA,
     WAITING_DELETION,
+
+    // Terminal state
     KEEP_AS_IS,
 }
 
@@ -61,7 +70,7 @@ class AssetStagingAreaRepository : PanacheRepositoryBase<StagedAsset, UUID> {
 
         val effectiveContentTypes = contentTypes.ifEmpty { ContentType.entries.toList() }
 
-        return find(query, userId, AssetConversionStates.QUEUED, effectiveContentTypes)
+        return find(query, userId, AssetConversionState.QUEUED, effectiveContentTypes)
             .page(pageIndex, pageSize)
             .list()
     }
@@ -79,6 +88,6 @@ class AssetStagingAreaRepository : PanacheRepositoryBase<StagedAsset, UUID> {
 
         val effectiveContentTypes = contentTypes.ifEmpty { ContentType.entries.toList() }
 
-        return count(query, userId, AssetConversionStates.QUEUED, effectiveContentTypes)
+        return count(query, userId, AssetConversionState.QUEUED, effectiveContentTypes)
     }
 }

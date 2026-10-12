@@ -17,16 +17,7 @@ CREATE TABLE assets_staging_area (
     asset_id        varchar(255) not null primary key,
     content_type    varchar(255) not null,
     current_state   varchar(255) not null,
-
-    foreign key (user_id) references user_info(id) on delete cascade
-);
-
---
-
-CREATE TABLE converted_assets (
-    user_id         integer not null,
-    asset_id        varchar(255) not null primary key,
-    current_state   varchar(255) not null,
+    replacement_id  varchar(255),
 
     foreign key (user_id) references user_info(id) on delete cascade
 );

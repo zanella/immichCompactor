@@ -1,12 +1,13 @@
 package services
 
-import database.AssetConversionStates
+import database.AssetConversionState
+import database.AssetId
 import database.AssetStagingAreaRepository
-import database.ConvertedAssetsRepository
 import database.StagedAsset
 import database.UserId
 import integration.immich.AssetMediaResponseDto
 import integration.immich.AssetResponseDto
+import integration.immich.CopyAssetRequest
 import integration.immich.CreateTagRequest
 import integration.immich.IMMICH_COMPACTOR_TAG_NAME
 import integration.immich.ImmichClient
@@ -31,7 +32,6 @@ import java.util.UUID
 @ApplicationScoped
 class ImmichService(
     private val assetStagingAreaRepository: AssetStagingAreaRepository,
-    private val convertedAssetsRepository: ConvertedAssetsRepository,
 ) {
     /**
      * I don't want to wrap the whole API, leak the client for now and decide later if it should be hidden
@@ -118,18 +118,13 @@ class ImmichService(
         // they can't start one themselves.
         val skippableAssets =
             QuarkusTransaction.joiningExisting().call {
-                val stagedAssetsIds =
-                    assetStagingAreaRepository
-                        .listAll()
-                        // TODO: filter on DB query, instead of return
-                        .filter { it.currentState != AssetConversionStates.WAITING_DELETION }
-                        .map { it.assetId }
-                        .toSet()
-
                 // TODO: If the amount is huge -> think how to handle
-                val convertedAssetsIds = convertedAssetsRepository.listAll().map { it.assetId }.toSet()
-
-                stagedAssetsIds + convertedAssetsIds
+                assetStagingAreaRepository
+                    .listAll()
+                    // TODO: filter on DB query, instead of return
+                    .filter { it.currentState != AssetConversionState.WAITING_DELETION }
+                    .map { it.assetId }
+                    .toSet()
             }
 
         var assetsFound = 0L
@@ -169,7 +164,7 @@ class ImmichService(
                                     .second
                                     .let(::getHandledContentTypeFromFileType)
                                     .contentType,
-                            currentState = AssetConversionStates.QUEUED,
+                            currentState = AssetConversionState.QUEUED,
                         )
                     }
 
@@ -231,6 +226,26 @@ class ImmichService(
                 .attribute("fileCreatedAt", assetResponse.fileCreatedAt, "")
                 .attribute("fileModifiedAt", assetResponse.fileModifiedAt, ""),
         )
+
+    // /////////////////////////////////////////////////////////////////////////
+
+    fun transferMetadata(
+        apiKey: String,
+        client: ImmichClient,
+        originalAssetId: AssetId,
+        replacementId: AssetId,
+    ) = client.copyAsset(
+        apiKey,
+        CopyAssetRequest(
+            albums = true,
+            favorite = true,
+            sharedLinks = true,
+            sidecar = true,
+            sourceId = originalAssetId,
+            stack = true,
+            targetId = replacementId,
+        ),
+    )
 
     // /////////////////////////////////////////////////////////////////////////
 

@@ -1,24 +1,29 @@
 package services
 
-import database.AssetConversionStates
+import database.AssetConversionState
+import database.AssetConversionState.KEEP_AS_IS
+import database.AssetConversionState.QUEUED
+import database.AssetConversionState.REPLACEMENT_HAS_BEEN_UPDATED_WITH_METADATA
+import database.AssetConversionState.REPLACEMENT_HAS_BEEN_UPLOADED
+import database.AssetConversionState.WAITING_DELETION
+import database.AssetId
 import database.AssetStagingAreaRepository
-import database.ConvertedAsset
-import database.ConvertedAssetStates
-import database.ConvertedAssetsRepository
+import database.StagedAsset
 import database.UserId
 import database.UserInfo
 import database.UserInfoRepository
 import database.getById
 import integration.immich.AssetMediaStatus
 import integration.immich.BulkTagAssetsDto
-import integration.immich.CopyAssetRequest
 import integration.immich.DeleteAssetsRequest
 import integration.immich.ImmichClient
 import internal.lang.CustomEither
 import internal.lang.runCatchingSafely
+import io.quarkus.logging.Log
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.transaction.Transactional
 import jakarta.ws.rs.core.MediaType
 import services.HandledContentType.UNKNOWN
 import java.io.File
@@ -30,7 +35,6 @@ import kotlin.system.exitProcess
 @ApplicationScoped
 class AssetConversionService(
     private val assetStagingAreaRepository: AssetStagingAreaRepository,
-    private val convertedAssetsRepository: ConvertedAssetsRepository,
     private val immichService: ImmichService,
     private val userInfoRepository: UserInfoRepository,
 ) {
@@ -45,13 +49,13 @@ class AssetConversionService(
                 .also { it.deleteOnExit() }
     }
 
+    // TODO: move out and use in the assetRefreshJob as well
     val perUserLimit: MutableMap<UserId, Any> = ConcurrentHashMap()
 
     fun processQueuedAssets(
-        client: ImmichClient,
-        userInfo: UserInfo,
+        userId: UserId,
         queuedAssetsId: Set<UUID>,
-        queuedAssetsContentTypes: Set<ContentType>,
+        queuedAssetsContentTypes: Set<ContentType> = emptySet(),
     ) {
         /* val stagedAssetsIds = QuarkusTransaction.joiningExisting().call {
             assetStagingAreaRepository
@@ -70,152 +74,235 @@ class AssetConversionService(
     fun processQueuedAsset(
         userId: UserId,
         queuedAssetId: UUID,
-        queuedAssetsContentTypes: Set<ContentType> = ContentType.entries.toSet(),
+        queuedAssetsContentTypesParam: Set<ContentType> = ContentType.entries.toSet(),
     ): CustomEither<Pair<UserInfo, UUID>, String> =
         synchronized(perUserLimit.getOrPut(userId) { Any() }) {
-            val userInfo = userInfoRepository.getById(userId.value)
+            val queuedAssetsContentTypes =
+                queuedAssetsContentTypesParam
+                    .ifEmpty { ContentType.entries.toSet() }
 
-            val client = immichService.instantiateClient(userInfo.immichServerUrl)
+            val ctx =
+                userInfoRepository
+                    .getById(userId.value)
+                    .let { it to immichService.instantiateClient(it.immichServerUrl) }
+                    .let { Context(client = it.second, userInfo = it.first) }
 
-            val deferredListOfFilesToDelete = mutableListOf<File?>()
+            var res: CustomEither<Pair<UserInfo, UUID>, String>? = null
 
             try {
-                val stagedAsset =
-                    QuarkusTransaction
-                        .joiningExisting()
-                        .call { assetStagingAreaRepository.findById(queuedAssetId) }
-                        ?: return CustomEither.Right("Asset not found in the Database")
-
-                println("stagedAsset: $stagedAsset")
-
-                val assetInfo = immichService.getAssetInfo(userInfo.apiKey, stagedAsset.assetId, client)
-
-                println("assetInfo: $assetInfo")
-
-                // TODO: check if asset has tag
-
-                if ((assetInfo == null) || assetInfo.isTrashed) {
-                    QuarkusTransaction.requiringNew().run { assetStagingAreaRepository.deleteById(stagedAsset.assetId) }
-
-                    return CustomEither.Right("The asset was either not found or has been trashed in Immich")
-                }
-
-                val (_, suffix) = splitFileName(assetInfo.originalFileName).also { require(it.second.isNotBlank()) }
-
-                // ////
-
-                val fileType = getHandledContentTypeFromFileType(suffix)
-
-                if (fileType.contentType !in queuedAssetsContentTypes) {
-                    return CustomEither.Right("The file type $fileType does not match the queued asset content")
-                }
-
-                // ////
-
-                // Download the asset
-                val downloadFd =
-                    File(temporaryWorkingDirectory, "originalDownloaded.$suffix")
-                        .also(deferredListOfFilesToDelete::add)
-
-                immichService.downloadAssetToDisk(
-                    apiKey = userInfo.apiKey,
-                    assetId = assetInfo.id,
-                    client = client,
-                    targetOutputFile = downloadFd,
-                )
-
-                // Convert it
-                val conversionResponse =
-                    convertAsset(fileType, downloadFd, assetInfo.originalFileName, temporaryWorkingDirectory)
-                        .also { deferredListOfFilesToDelete.add(it.convertedFile) }
-
-                val convertedFd =
-                    when (conversionResponse.reason) {
-                        AssetConversionReason.OK -> requireNotNull(conversionResponse.convertedFile)
-                        AssetConversionReason.ORIGINAL_IS_SMALLER -> {
-                            QuarkusTransaction.joiningExisting().call {
+                while (res == null) {
+                    val stagedAsset =
+                        QuarkusTransaction
+                            .joiningExisting()
+                            .call {
                                 assetStagingAreaRepository
-                                    .getById(stagedAsset.assetId)
-                                    .currentState = AssetConversionStates.KEEP_AS_IS
+                                    .findById(queuedAssetId)
+                                    ?.also { Log.debug("stagedAsset: $it") }
                             }
+                            ?: return CustomEither.Right("Asset not found in the Database")
 
-                            return CustomEither.Right("The original asset is smaller than the converted one")
+                    println("Asset current state: ${stagedAsset.currentState}")
+
+                    res =
+                        when (stagedAsset.currentState) {
+                            QUEUED -> handleQueuedState(ctx, queuedAssetsContentTypes, stagedAsset)
+                            REPLACEMENT_HAS_BEEN_UPLOADED -> handleReplacementHasBeenUploaded(ctx, stagedAsset)
+                            REPLACEMENT_HAS_BEEN_UPDATED_WITH_METADATA ->
+                                handleReplacementHasBeenUpdatedWithMetadata(ctx, stagedAsset)
+                            WAITING_DELETION -> handleWaitingDeletion(ctx, stagedAsset)
+                            KEEP_AS_IS -> CustomEither.Right("This asset shouldn't be selectable in the UI...")
                         }
-                    }
-
-                // TODO: get from the actual converted file
-                val mediaType = MediaType.valueOf("video/mp4")
-
-                // Upload the converted asset
-                val uploadResponse =
-                    immichService
-                        .uploadLocalFile(userInfo.apiKey, assetInfo, client, convertedFd, mediaType)
-                        .also {
-                            /*
-                             * TODO: If the application dies right after here, it won't be CREATED,
-                             *  what to do then ?
-                             */
-                            require(it.status == AssetMediaStatus.CREATED) {
-                                "Immich said ${convertedFd.name} is a ${it.status}"
-                            }
-                        }
-
-                // TODO: save state: if the service dies pick up from here
-
-                // Replacement: Save state
-                val replacementEntity =
-                    ConvertedAsset(
-                        userId = userInfo.id,
-                        assetId = uploadResponse.id,
-                        currentState = ConvertedAssetStates.UPLOADED,
-                    ).also(convertedAssetsRepository::store)
-
-                // Transfer metadata
-                client.copyAsset(
-                    userInfo.apiKey,
-                    CopyAssetRequest(
-                        albums = true,
-                        favorite = true,
-                        sharedLinks = true,
-                        sidecar = true,
-                        sourceId = assetInfo.id,
-                        stack = true,
-                        targetId = uploadResponse.id,
-                    ),
-                )
-
-                client
-                    .bulkTagAssets(
-                        userInfo.apiKey,
-                        BulkTagAssetsDto(assetIds = listOf(uploadResponse.id), tagIds = listOf(userInfo.tagId)),
-                    ).also {
-                        if (it.count != 1) {
-                            return CustomEither.Right("Immich didn't tag the new asset ${uploadResponse.id}")
-                        }
-                    }
-
-                stagedAsset.currentState = AssetConversionStates.WAITING_DELETION
-                replacementEntity.currentState = ConvertedAssetStates.COMPLETE
-
-                // TODO: receive option to HARD-delete
-
-                // Send original asset to trash
-                client.deleteAssets(
-                    userInfo.apiKey,
-                    DeleteAssetsRequest(ids = listOf(assetInfo.id), force = false),
-                )
-
-                QuarkusTransaction.joiningExisting().call {
-                    assetStagingAreaRepository.dropById(assetInfo.id)
-
-                    convertedAssetsRepository.dropById(replacementEntity.assetId)
                 }
 
-                return CustomEither.Left(userInfo to uploadResponse.id)
+                return res
             } finally {
-                deferredListOfFilesToDelete.filterNotNull().forEach { runCatchingSafely { it.delete() } }
+                ctx.deferredListOfFilesToDelete.filterNotNull().forEach { runCatchingSafely { it.delete() } }
             }
         }
+
+    // /////////////////////////////////////////////////////////////////////////
+
+    private data class Context(
+        val client: ImmichClient,
+        val deferredListOfFilesToDelete: MutableList<File?> = mutableListOf(),
+        val userInfo: UserInfo,
+    )
+
+    private fun handleQueuedState(
+        ctx: Context,
+        queuedAssetsContentTypes: Set<ContentType>,
+        stagedAsset: StagedAsset,
+    ): CustomEither<Pair<UserInfo, UUID>, String>? =
+        with(ctx) {
+            val assetInfoResult = immichService.getAssetInfo(userInfo.apiKey, stagedAsset.assetId, client)
+
+            println("assetInfo: $assetInfoResult")
+
+            val errorMsgForSituationThatDropsTheAssetFromQueue =
+                if (assetInfoResult == null) {
+                    "The asset was not found in Immich"
+                } else if (assetInfoResult.isTrashed) {
+                    "The asset has been trashed in Immich"
+                } else if (assetInfoResult.tags.any { tagInfo -> tagInfo.id == userInfo.tagId }) {
+                    "The asset is already tagged."
+                } else {
+                    null
+                }
+
+            errorMsgForSituationThatDropsTheAssetFromQueue
+                ?.also { errorMsg ->
+                    QuarkusTransaction
+                        .requiringNew()
+                        .run { assetStagingAreaRepository.deleteById(stagedAsset.assetId) }
+
+                    return CustomEither.Right(errorMsg)
+                }
+
+            val assetInfo = requireNotNull(assetInfoResult)
+
+            val (_, suffix) =
+                splitFileName(assetInfo.originalFileName)
+                    .also { require(it.second.isNotBlank()) }
+
+            // ////
+
+            val fileType = getHandledContentTypeFromFileType(suffix)
+
+            if (fileType.contentType !in queuedAssetsContentTypes) {
+                return CustomEither.Right("The file type $fileType does not match the queued asset content")
+            }
+
+            // Download the asset
+            val downloadFd =
+                downloadAssetToDisk(assetInfo.id, client, suffix, userInfo)
+                    .also(deferredListOfFilesToDelete::add)
+
+            // Convert it
+            val conversionResponse =
+                convertAsset(fileType, downloadFd, assetInfo.originalFileName, temporaryWorkingDirectory)
+                    .also { deferredListOfFilesToDelete.add(it.convertedFile) }
+
+            val convertedFd =
+                when (conversionResponse.reason) {
+                    AssetConversionReason.OK -> requireNotNull(conversionResponse.convertedFile)
+                    AssetConversionReason.ORIGINAL_IS_SMALLER -> {
+                        modifyAsset(stagedAsset, KEEP_AS_IS)
+
+                        return CustomEither.Right("The original asset is smaller than the converted one")
+                    }
+                }
+
+            // TODO: get from the actual converted file
+            val mediaType = MediaType.valueOf("video/mp4")
+
+            // Upload the converted asset
+            immichService
+                .uploadLocalFile(userInfo.apiKey, assetInfo, client, convertedFd, mediaType)
+                .also {
+                    if (it.status != AssetMediaStatus.CREATED) {
+                        return CustomEither.Right("Immich said ${convertedFd.name} is a ${it.status}")
+                    }
+
+                    modifyAsset(stagedAsset, REPLACEMENT_HAS_BEEN_UPLOADED, it.id)
+                }
+
+            return null
+        }
+
+    private fun handleReplacementHasBeenUploaded(
+        ctx: Context,
+        stagedAsset: StagedAsset,
+    ): CustomEither<Pair<UserInfo, UUID>, String>? =
+        with(ctx) {
+            immichService
+                .transferMetadata(userInfo.apiKey, client, stagedAsset.assetId, requireNotNull(stagedAsset.replacementId))
+                .also { modifyAsset(stagedAsset, REPLACEMENT_HAS_BEEN_UPDATED_WITH_METADATA) }
+
+            return null
+        }
+
+    private fun handleReplacementHasBeenUpdatedWithMetadata(
+        ctx: Context,
+        stagedAsset: StagedAsset,
+    ): CustomEither<Pair<UserInfo, UUID>, String>? =
+        with(ctx) {
+            client
+                .bulkTagAssets(
+                    userInfo.apiKey,
+                    BulkTagAssetsDto(
+                        assetIds = listOf(requireNotNull(stagedAsset.replacementId)),
+                        tagIds = listOf(userInfo.tagId),
+                    ),
+                ).also {
+                    if (it.count != 1) {
+                        return CustomEither.Right("Immich didn't tag the new asset ${stagedAsset.replacementId}")
+                    }
+
+                    modifyAsset(stagedAsset, WAITING_DELETION)
+                }
+
+            return null
+        }
+
+    private fun handleWaitingDeletion(
+        ctx: Context,
+        stagedAsset: StagedAsset,
+    ): CustomEither<Pair<UserInfo, UUID>, String> =
+        with(ctx) {
+            // TODO: receive option to HARD-delete
+
+            // Send original asset to trash
+            client
+                .deleteAssets(
+                    userInfo.apiKey,
+                    DeleteAssetsRequest(ids = listOf(stagedAsset.assetId), force = false),
+                ).also {
+                    QuarkusTransaction.joiningExisting().call {
+                        assetStagingAreaRepository.dropById(stagedAsset.assetId)
+                    }
+                }
+
+            return CustomEither.Left(userInfo to requireNotNull(stagedAsset.replacementId))
+        }
+
+    // /////////////////////////////////////////////////////////////////////////
+
+    @Transactional
+    protected fun modifyAsset(
+        stagedAsset: StagedAsset,
+        newState: AssetConversionState? = null,
+        replacementIdParam: AssetId? = null,
+    ) {
+        assetStagingAreaRepository.getById(stagedAsset.assetId).run {
+            if (newState != null) {
+                currentState = newState
+            }
+
+            if (replacementIdParam != null) {
+                replacementId = replacementIdParam
+            }
+
+            assetStagingAreaRepository.flush()
+        }
+    }
+
+    private fun downloadAssetToDisk(
+        assetId: UUID,
+        client: ImmichClient,
+        suffix: String,
+        userInfo: UserInfo,
+    ): File {
+        val downloadFd = File(temporaryWorkingDirectory, "originalDownloaded.$suffix")
+
+        immichService.downloadAssetToDisk(
+            apiKey = userInfo.apiKey,
+            assetId = assetId,
+            client = client,
+            targetOutputFile = downloadFd,
+        )
+
+        return downloadFd
+    }
 }
 
 fun convertAsset(
@@ -248,7 +335,7 @@ fun convertImage(
 
     executeCmd(command)
 
-    println("Success: Image converted to JXL.")
+    Log.debug("Success: Image converted to JXL.")
 
     return AssetConversionReturn(convertedFd, AssetConversionReason.OK)
 }
