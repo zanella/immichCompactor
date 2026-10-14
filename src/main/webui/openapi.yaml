@@ -2,6 +2,33 @@
 openapi: 3.1.0
 components:
   schemas:
+    AssetRefreshJobStatus:
+      type: object
+      required:
+      - threadId
+      - state
+      properties:
+        threadId:
+          type: integer
+          format: int64
+        state:
+          $ref: "#/components/schemas/State"
+        assetsFound:
+          type: integer
+          format: int64
+        assetsQueued:
+          type: integer
+          format: int64
+        error:
+          type:
+          - string
+          - "null"
+        startedAt:
+          $ref: "#/components/schemas/Instant"
+        endedAt:
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
     ConvertResultResponse:
       type: object
       required:
@@ -33,33 +60,6 @@ components:
         nanosecondsOfSecond:
           type: integer
           format: int32
-    JobStatus:
-      type: object
-      required:
-      - threadId
-      - state
-      properties:
-        threadId:
-          type: integer
-          format: int64
-        state:
-          $ref: "#/components/schemas/State"
-        assetsFound:
-          type: integer
-          format: int64
-        assetsQueued:
-          type: integer
-          format: int64
-        error:
-          type:
-          - string
-          - "null"
-        startedAt:
-          $ref: "#/components/schemas/Instant"
-        endedAt:
-          anyOf:
-          - $ref: "#/components/schemas/Instant"
-          - type: "null"
     QueuedAssetsResponse:
       type: object
       required:
@@ -283,7 +283,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/JobStatus"
+                $ref: "#/components/schemas/AssetRefreshJobStatus"
       summary: Refresh Assets
       tags:
       - User Resource
@@ -301,7 +301,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/JobStatus"
+                $ref: "#/components/schemas/AssetRefreshJobStatus"
       summary: Refresh Status
       tags:
       - User Resource

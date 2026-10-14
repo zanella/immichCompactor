@@ -22,7 +22,7 @@ class AssetRefreshJobService(
     enum class State { RUNNING, DONE, FAILED }
 
     @Serializable
-    data class JobStatus(
+    data class AssetRefreshJobStatus(
         val threadId: Long,
         val state: State,
         //
@@ -34,48 +34,42 @@ class AssetRefreshJobService(
         val endedAt: Instant? = null,
     )
 
-    // TODO: do this properly
-    // userId -> latest status. One entry per user; overwritten on each new job.
-    private val jobs = ConcurrentHashMap<UserId, JobStatus>()
+    private val jobs = ConcurrentHashMap<UserId, AssetRefreshJobStatus>()
 
-    fun status(userId: UserId): JobStatus? = jobs[userId]
+    fun status(userId: UserId): AssetRefreshJobStatus? = jobs[userId]
 
     /**
      * Launches a refresh for [UserId] unless one is already running; returns true if a new
      * job was started. The RUNNING flag is checked atomically so concurrent calls can't
      * spawn duplicate jobs.
      */
-    fun start(userInfo: UserInfo): JobStatus =
-        with(userInfo) {
-            jobs[id].also { lastKnownJob ->
-                if (lastKnownJob == null) {
-                    return@also
+    fun start(userInfo: UserInfo): AssetRefreshJobStatus =
+        perUserLimit(userInfo.id) {
+            with(userInfo) {
+                jobs[id]?.also { lastKnownJob ->
+                    if (lastKnownJob.state == State.DONE) {
+                        jobs.remove(id)
+                    } else {
+                        return@perUserLimit lastKnownJob
+                    }
                 }
 
-                if (lastKnownJob.state == State.DONE) {
-                    jobs.remove(id)
+                return jobs.getOrPut(id) {
+                    val t = Thread.ofVirtual().unstarted { runRefresh(userInfo) }
+
+                    AssetRefreshJobStatus(threadId = t.threadId(), State.RUNNING, 0).also { t.start() }
                 }
-            }
-
-            return jobs.getOrPut(id) {
-                val t = Thread.ofVirtual().unstarted { runRefresh(id, apiKey, immichServerUrl) }
-
-                JobStatus(threadId = t.threadId(), State.RUNNING, 0).also { t.start() }
             }
         }
 
-    private fun runRefresh(
-        userId: UserId,
-        apiKey: String,
-        immichServerUrl: String,
-    ): JobStatus =
+    private fun runRefresh(userInfo: UserInfo): AssetRefreshJobStatus =
         jobs
-            .getValue(userId)
+            .getValue(userInfo.id)
             .let { prevJobStatus ->
                 runCatchingSafely {
-                    val client = immichService.instantiateClient(immichServerUrl)
+                    val client = immichService.instantiateClient(userInfo.immichServerUrl)
 
-                    immichService.findAndEnqueueAllAssets(apiKey, userId, client).let {
+                    immichService.findAndEnqueueAllAssets(client, userInfo).let {
                         prevJobStatus.copy(
                             state = State.DONE,
                             assetsFound = it.assetsFound,
@@ -86,5 +80,5 @@ class AssetRefreshJobService(
                     prevJobStatus.copy(state = State.FAILED, error = e.message ?: e.toString())
                 }
             }.copy(endedAt = Clock.System.now())
-            .also { jobs[userId] = it }
+            .also { jobs[userInfo.id] = it }
 }

@@ -50,14 +50,14 @@ class UserResource(
     @Produces(APPLICATION_JSON)
     fun refreshStatus(
         @PathParam("id") rawUserId: String,
-    ): AssetRefreshJobService.JobStatus? = UserId.from(rawUserId).let(assetRefreshJobService::status)
+    ): AssetRefreshJobService.AssetRefreshJobStatus? = UserId.from(rawUserId).let(assetRefreshJobService::status)
 
     @POST
     @Path("/{id}/assets/refresh")
     @Produces(APPLICATION_JSON)
     fun refreshAssets(
         @PathParam("id") rawUserId: String,
-    ): AssetRefreshJobService.JobStatus =
+    ): AssetRefreshJobService.AssetRefreshJobStatus =
         UserId
             .from(rawUserId)
             .let(userInfoService::userDetails)

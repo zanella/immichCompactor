@@ -4,7 +4,7 @@ import database.AssetConversionState
 import database.AssetId
 import database.AssetStagingAreaRepository
 import database.StagedAsset
-import database.UserId
+import database.UserInfo
 import integration.immich.AssetMediaResponseDto
 import integration.immich.AssetResponseDto
 import integration.immich.CopyAssetRequest
@@ -17,6 +17,7 @@ import integration.immich.SearchAssetsRequest.Companion.SearchFilter
 import integration.immich.SearchAssetsRequest.Companion.SearchFilter.Companion.IdsFilter
 import integration.immich.SearchAssetsResponse
 import integration.immich.TagResponseDto
+import io.quarkus.logging.Log
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.MediaType
@@ -72,9 +73,8 @@ class ImmichService(
     }
 
     fun findAllAssets(
-        apiKey: String,
         client: ImmichClient,
-        tagId: UUID,
+        userInfo: UserInfo,
         cursor: String? = null,
     ): SearchAssetsResponse {
         val searchCriteria =
@@ -83,13 +83,13 @@ class ImmichService(
                     SearchFilter(
                         tagIds =
                             IdsFilter(
-                                none = listOf(tagId),
+                                none = listOf(userInfo.tagId),
                             ),
                     ),
                 cursor = cursor,
             )
 
-        return client.searchByMetadata(apiKey, searchCriteria)
+        return client.searchByMetadata(userInfo.apiKey, searchCriteria)
     }
 
     data class FindAndEnqueueAllAssetsResponse(
@@ -103,9 +103,8 @@ class ImmichService(
      * we feed back into the following request until it runs out.
      */
     fun findAndEnqueueAllAssets(
-        apiKey: String,
-        userId: UserId,
         client: ImmichClient,
+        userInfo: UserInfo,
     ): FindAndEnqueueAllAssetsResponse {
         /*
          * TODO: https://api.immich.app/endpoints/jobs/getQueuesLegacy
@@ -131,11 +130,8 @@ class ImmichService(
         var assetsQueued = 0L
         var nextCursor: String? = null
 
-        // TODO: add this to the userInfo, and fetch once
-        val tagId = upsertTag(apiKey, client).id
-
         do {
-            val searchAssetsResponse = findAllAssets(apiKey, client, tagId, nextCursor).assets
+            val searchAssetsResponse = findAllAssets(client, userInfo, nextCursor).assets
 
             val assetsToBeStaged =
                 searchAssetsResponse.items
@@ -143,21 +139,21 @@ class ImmichService(
                     .filter { !it.isTrashed }
                     .filter { asset ->
                         val tagFound =
-                            getAssetInfo(apiKey, asset.id, client)
+                            getAssetInfo(userInfo.apiKey, asset.id, client)
                                 ?.tags
                                 ?.filter { tag -> tag.name == IMMICH_COMPACTOR_TAG_NAME }
                                 ?.toSet()
                                 ?: emptySet()
 
                         if (!tagFound.isEmpty()) {
-                            println("Asset [${asset.id}] is already tagged, skipping it")
+                            Log.debug("Asset [${asset.id}] is already tagged, skipping it")
                             false
                         } else {
                             true
                         }
                     }.map { asset ->
                         StagedAsset(
-                            userId = userId,
+                            userId = userInfo.id,
                             assetId = asset.id,
                             contentType =
                                 splitFileName(asset.originalFileName)
@@ -206,7 +202,7 @@ class ImmichService(
             Files.copy(input, targetOutputFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
 
-        println("Successfully wrote asset binary stream to: ${targetOutputFile.absolutePath}")
+        Log.debug("Successfully wrote asset binary stream to: ${targetOutputFile.absolutePath}")
     }
 
     fun uploadLocalFile(

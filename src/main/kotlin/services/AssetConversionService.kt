@@ -29,7 +29,6 @@ import services.HandledContentType.UNKNOWN
 import java.io.File
 import java.nio.file.Files
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.system.exitProcess
 
 @ApplicationScoped
@@ -48,9 +47,6 @@ class AssetConversionService(
                 .toFile()
                 .also { it.deleteOnExit() }
     }
-
-    // TODO: move out and use in the assetRefreshJob as well
-    val perUserLimit: MutableMap<UserId, Any> = ConcurrentHashMap()
 
     fun processQueuedAssets(
         userId: UserId,
@@ -76,7 +72,7 @@ class AssetConversionService(
         queuedAssetId: UUID,
         queuedAssetsContentTypesParam: Set<ContentType> = ContentType.entries.toSet(),
     ): CustomEither<Pair<UserInfo, UUID>, String> =
-        synchronized(perUserLimit.getOrPut(userId) { Any() }) {
+        perUserLimit(userId) {
             val queuedAssetsContentTypes =
                 queuedAssetsContentTypesParam
                     .ifEmpty { ContentType.entries.toSet() }
@@ -101,7 +97,7 @@ class AssetConversionService(
                             }
                             ?: return CustomEither.Right("Asset not found in the Database")
 
-                    println("Asset current state: ${stagedAsset.currentState}")
+                    Log.debug("Asset current state: ${stagedAsset.currentState}")
 
                     res =
                         when (stagedAsset.currentState) {
@@ -136,7 +132,7 @@ class AssetConversionService(
         with(ctx) {
             val assetInfoResult = immichService.getAssetInfo(userInfo.apiKey, stagedAsset.assetId, client)
 
-            println("assetInfo: $assetInfoResult")
+            Log.debug("assetInfo: $assetInfoResult")
 
             val errorMsgForSituationThatDropsTheAssetFromQueue =
                 if (assetInfoResult == null) {
@@ -350,7 +346,7 @@ private fun executeCmd(command: String) {
     if (exitCode != 0) {
         val errorResult = process.inputStream.bufferedReader().readText()
 
-        println("Failed with exit code $exitCode. Error: $errorResult")
+        Log.error("Failed with exit code $exitCode. Error: $errorResult")
 
         // TODO: mark item as failure, NOT exit
         exitProcess(exitCode)
@@ -379,7 +375,7 @@ fun convertVideo(
     return if (input.length() <= convertedFd.length()) {
         // TODO: this is rather stupid, change it to mark the original as NON-ACTIONABLE
 
-        println("Original: ${input.length()} | converted: ${convertedFd.length()}")
+        Log.debug("Original: ${input.length()} | converted: ${convertedFd.length()}")
 
         convertedFd.delete()
 
