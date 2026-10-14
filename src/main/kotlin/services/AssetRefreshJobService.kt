@@ -2,6 +2,7 @@ package services
 
 import database.UserId
 import database.UserInfo
+import integration.immich.ImmichClient
 import internal.lang.getOrElseException
 import internal.lang.runCatchingSafely
 import jakarta.inject.Singleton
@@ -67,7 +68,7 @@ class AssetRefreshJobService(
             .getValue(userInfo.id)
             .let { prevJobStatus ->
                 runCatchingSafely {
-                    val client = immichService.instantiateClient(userInfo.immichServerUrl)
+                    val client = ImmichClient.instantiateClient(userInfo.immichServerUrl)
 
                     immichService.findAndEnqueueAllAssets(client, userInfo).let {
                         prevJobStatus.copy(

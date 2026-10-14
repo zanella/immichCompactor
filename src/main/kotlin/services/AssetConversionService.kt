@@ -80,7 +80,7 @@ class AssetConversionService(
             val ctx =
                 userInfoRepository
                     .getById(userId.value)
-                    .let { it to immichService.instantiateClient(it.immichServerUrl) }
+                    .let { it to ImmichClient.instantiateClient(it.immichServerUrl) }
                     .let { Context(client = it.second, userInfo = it.first) }
 
             var res: CustomEither<Pair<UserInfo, UUID>, String>? = null

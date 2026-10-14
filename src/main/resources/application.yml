@@ -29,4 +29,10 @@ quarkus:
       jdbc:
         url: jdbc:sqlite:sandbox/immich_compactor.db
         new-connection-sql: "PRAGMA foreign_keys = ON;"
+
+"%test":
+  quarkus:
+    datasource:
+      jdbc:
+        url: jdbc:sqlite:/tmp/immichCompactorIntegration.db
 #EOF

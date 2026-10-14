@@ -40,20 +40,25 @@ class ImmichService(
     fun instantiateClient(
         baseUrl: String,
         isDebug: Boolean = true,
-    ): ImmichClient =
-        RestClientBuilder
-            .newBuilder()
-            .baseUri(URI.create(baseUrl))
-            .property("microprofile.rest.client.disable.default.mapper", true)
-            .also {
-                if (isDebug) {
-                    // 1. Enable built-in network logging scope
-                    it.property("quarkus.rest-client.logging.scope", "request-response")
-                    // 2. Set max body log limits in characters
-                    it.property("quarkus.rest-client.logging.body-limit", "50000")
-                    it.register(ImmichLoggingFilter::class.java)
-                }
-            }.build(ImmichClient::class.java)
+    ): ImmichClient = Companion.instantiateClient(baseUrl, isDebug)
+
+    companion object {
+        fun instantiateClient(
+            baseUrl: String,
+            isDebug: Boolean = true,
+        ): ImmichClient =
+            RestClientBuilder
+                .newBuilder()
+                .baseUri(URI.create(baseUrl))
+                .property("microprofile.rest.client.disable.default.mapper", true)
+                .also {
+                    if (isDebug) {
+                        it.property("quarkus.rest-client.logging.scope", "request-response")
+                        it.property("quarkus.rest-client.logging.body-limit", "50000")
+                        it.register(ImmichLoggingFilter::class.java)
+                    }
+                }.build(ImmichClient::class.java)
+    }
 
     fun getAssetInfo(
         apiKey: String,

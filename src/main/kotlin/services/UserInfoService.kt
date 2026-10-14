@@ -9,6 +9,7 @@ import database.UserId
 import database.UserInfo
 import database.UserInfoRepository
 import database.getById
+import integration.immich.ImmichClient
 import internal.serdes.UUIDSerializer
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
@@ -39,7 +40,7 @@ class UserInfoService(
                 )
             }
 
-            val tagId = immichService.upsertTag(apiKey, immichService.instantiateClient(immichServerUrl)).id
+            val tagId = immichService.upsertTag(apiKey, ImmichClient.instantiateClient(immichServerUrl)).id
 
             // Only now open a transaction to persist the change (flushed on commit).
             QuarkusTransaction.requiringNew().run {
@@ -135,7 +136,7 @@ class UserInfoService(
         apiKey: String,
     ): Boolean =
         runCatching {
-            immichService.instantiateClient(immichServerUrl).authValidateToken(apiKey).authStatus
+            ImmichClient.instantiateClient(immichServerUrl).authValidateToken(apiKey).authStatus
         }.getOrDefault(false)
 
     companion object {

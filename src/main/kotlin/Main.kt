@@ -10,6 +10,7 @@ class Main {
      *
      * TODO Gradle:
      *  - Compile with GraalVM
+     *  - Run unit tests against the binary
      *
      * TODO DB:
      *  - docker volume

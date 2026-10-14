@@ -15,10 +15,12 @@ import jakarta.ws.rs.client.ClientResponseContext
 import jakarta.ws.rs.client.ClientResponseFilter
 import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
+import org.eclipse.microprofile.rest.client.RestClientBuilder
 import org.jboss.logging.Logger
 import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
@@ -129,6 +131,27 @@ interface ImmichClient {
 
     companion object {
         const val X_API_KEY = "x-api-key"
+
+        /**
+         * I don't want to wrap the whole API, leak the client for now and decide later if it should be hidden
+         */
+        fun instantiateClient(
+            baseUrl: String,
+            isDebug: Boolean = true,
+        ): ImmichClient =
+            RestClientBuilder
+                .newBuilder()
+                .baseUri(URI.create(baseUrl))
+                .property("microprofile.rest.client.disable.default.mapper", true)
+                .also {
+                    if (isDebug) {
+                        // 1. Enable built-in network logging scope
+                        it.property("quarkus.rest-client.logging.scope", "request-response")
+                        // 2. Set max body log limits in characters
+                        it.property("quarkus.rest-client.logging.body-limit", "50000")
+                        it.register(ImmichLoggingFilter::class.java)
+                    }
+                }.build(ImmichClient::class.java)
     }
 }
 

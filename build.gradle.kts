@@ -56,6 +56,11 @@ dependencies {
 
     // Test
     testImplementation(kotlin("test"))
+    testImplementation("io.quarkus:quarkus-junit5")
+    testImplementation(enforcedPlatform("org.testcontainers:testcontainers-bom:1.21.3"))
+    testImplementation("org.testcontainers:testcontainers")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
 }
 
 kotlin {
