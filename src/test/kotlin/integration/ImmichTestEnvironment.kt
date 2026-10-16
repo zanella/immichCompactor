@@ -57,6 +57,9 @@ object ImmichTestEnvironment {
     var apiKey: String
         private set
 
+    var appUserId: Int
+        private set
+
     init {
         File(UPLOAD_DIR).deleteRecursively()
         postgres.start()
@@ -65,6 +68,7 @@ object ImmichTestEnvironment {
         waitForServerAbout()
         setupAdminUser()
         apiKey = createApiKey()
+        appUserId = registerUserInApp()
 
         Runtime.getRuntime().addShutdownHook(
             Thread {
@@ -157,6 +161,29 @@ object ImmichTestEnvironment {
         return checkNotNull(secretMatch?.groupValues?.get(1)) {
             "Could not extract API key secret from response: $responseBody"
         }
+    }
+
+    private fun registerUserInApp(): Int {
+        val appUrl = "http://localhost:8081"
+        val body = """{"name":"Test User","immichServerUrl":"$baseUrl","apiKey":"$apiKey"}"""
+
+        val url = URI.create("$appUrl/api/users").toURL()
+        val connection = url.openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.setRequestProperty("Content-Type", "application/json")
+        connection.doOutput = true
+        connection.connectTimeout = 10000
+        connection.readTimeout = 10000
+
+        connection.outputStream.use { it.write(body.toByteArray()) }
+
+        val responseCode = connection.responseCode
+        val responseBody = connection.inputStream.bufferedReader().readText()
+
+        check(responseCode == 200) { "User registration failed: $responseCode - $responseBody" }
+
+        return responseBody.trim().toIntOrNull()
+            ?: error("Expected user ID in response body, got: $responseBody")
     }
 
     private fun login(): String {

@@ -72,21 +72,8 @@ class UploadRefreshConvertImageTest {
 
     @Test
     @Order(2)
-    fun `register user and refresh assets`() {
-        val tagId = immichService.upsertTag(immichApiKey, client).id
-
-        QuarkusTransaction.requiringNew().run {
-            assetStagingAreaRepository.deleteAll()
-            userInfoRepository.deleteAll()
-
-            database
-                .UserInfo(
-                    apiKey = immichApiKey,
-                    name = "Test User",
-                    immichServerUrl = immichBaseUrl,
-                    _tagUUID = tagId.toString(),
-                ).also { userInfoRepository.persist(it) }
-        }
+    fun `refresh assets`() {
+        QuarkusTransaction.requiringNew().run { assetStagingAreaRepository.deleteAll() }
 
         val userInfo =
             QuarkusTransaction

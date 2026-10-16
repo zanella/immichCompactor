@@ -71,21 +71,8 @@ class UploadRefreshConvertVideoTest {
 
     @Test
     @Order(2)
-    fun `register user and refresh assets`() {
-        val tagId = immichService.upsertTag(immichApiKey, client).id
-
-        QuarkusTransaction.requiringNew().run {
-            assetStagingAreaRepository.deleteAll()
-            userInfoRepository.deleteAll()
-
-            database
-                .UserInfo(
-                    apiKey = immichApiKey,
-                    name = "Video Test User",
-                    immichServerUrl = immichBaseUrl,
-                    _tagUUID = tagId.toString(),
-                ).also { userInfoRepository.persist(it) }
-        }
+    fun `refresh assets`() {
+        QuarkusTransaction.requiringNew().run { assetStagingAreaRepository.deleteAll() }
 
         val userInfo =
             QuarkusTransaction
@@ -144,11 +131,14 @@ class UploadRefreshConvertVideoTest {
 
         val originalResponse = client.getAssetInfo(immichApiKey, originalId)
         assertEquals(200, originalResponse.status, "Could not fetch original asset")
+
         val originalAsset = originalResponse.readEntity(AssetResponseDto::class.java)
         assertTrue(originalAsset.isTrashed, "Original asset should be trashed")
 
+        // ///
         val newResponse = client.getAssetInfo(immichApiKey, newId)
         assertEquals(200, newResponse.status, "Could not fetch replacement asset")
+
         val newAsset = newResponse.readEntity(AssetResponseDto::class.java)
         assertFalse(newAsset.isTrashed, "Replacement asset should not be trashed")
     }
