@@ -270,6 +270,37 @@ class ImmichService(
                 )
 
     // /////////////////////////////////////////////////////////////////////////
+
+    fun ensureTagsFeatureEnabled(
+        apiKey: String,
+        client: ImmichClient,
+    ) {
+        val getResponse = client.getSystemConfig(apiKey)
+
+        check(getResponse.status == 200) {
+            "Failed to GET system config: ${getResponse.status}"
+        }
+
+        val currentConfig = getResponse.readEntity(String::class.java)
+
+        if (!currentConfig.contains("\"tags\":{\"enabled\":false}")) {
+            return
+        }
+
+        val updatedConfig =
+            currentConfig.replace(
+                "\"tags\":{\"enabled\":false}",
+                "\"tags\":{\"enabled\":true}",
+            )
+
+        val putResponse = client.updateSystemConfig(apiKey, updatedConfig)
+
+        check(putResponse.status in 200..299) {
+            "Failed to enable tags feature: ${putResponse.status}"
+        }
+    }
+
+    // /////////////////////////////////////////////////////////////////////////
 }
 
 fun getHandledContentTypeFromFileType(fileType: String): HandledContentType =

@@ -129,6 +129,20 @@ interface ImmichClient {
         @HeaderParam(X_API_KEY) apiKey: String,
     ): ServerAboutDto
 
+    @GET
+    @Path("/system-config")
+    fun getSystemConfig(
+        @HeaderParam(X_API_KEY) apiKey: String,
+    ): Response
+
+    @PUT
+    @Path("/system-config")
+    @Consumes(MediaType.APPLICATION_JSON)
+    fun updateSystemConfig(
+        @HeaderParam(X_API_KEY) apiKey: String,
+        body: String,
+    ): Response
+
     companion object {
         const val X_API_KEY = "x-api-key"
 

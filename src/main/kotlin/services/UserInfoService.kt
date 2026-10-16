@@ -40,7 +40,11 @@ class UserInfoService(
                 )
             }
 
-            val tagId = immichService.upsertTag(apiKey, ImmichClient.instantiateClient(immichServerUrl)).id
+            val client = ImmichClient.instantiateClient(immichServerUrl)
+
+            immichService.ensureTagsFeatureEnabled(apiKey, client)
+
+            val tagId = immichService.upsertTag(apiKey, client).id
 
             // Only now open a transaction to persist the change (flushed on commit).
             return QuarkusTransaction.requiringNew().call {

@@ -4,6 +4,7 @@ import database.AssetStagingAreaRepository
 import database.UserInfoRepository
 import integration.immich.AssetMediaStatus
 import integration.immich.AssetResponseDto
+import integration.immich.IMMICH_COMPACTOR_TAG_NAME
 import integration.immich.ImmichClient
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
@@ -44,6 +45,7 @@ class UploadRefreshConvertVideoTest {
     companion object {
         private var uploadedAssetId: UUID? = null
         private var replacementAssetId: UUID? = null
+        private var originalAssetInfo: AssetResponseDto? = null
     }
 
     @Test
@@ -67,6 +69,9 @@ class UploadRefreshConvertVideoTest {
         assertEquals(AssetMediaStatus.CREATED, response.status, "Upload did not create asset")
         uploadedAssetId = response.id
         assertNotNull(uploadedAssetId, "Uploaded asset id should not be null")
+
+        val assetInfoResponse = client.getAssetInfo(immichApiKey, uploadedAssetId!!)
+        originalAssetInfo = assetInfoResponse.readEntity(AssetResponseDto::class.java)
     }
 
     @Test
@@ -119,7 +124,7 @@ class UploadRefreshConvertVideoTest {
             "Expected video conversion to succeed, got: $result",
         )
 
-        replacementAssetId = (result as internal.lang.CustomEither.Left).value.second
+        replacementAssetId = result.value.second
         assertNotNull(replacementAssetId, "Expected a replacement asset id")
     }
 
@@ -128,18 +133,38 @@ class UploadRefreshConvertVideoTest {
     fun `original asset is trashed and replacement is in timeline`() {
         val originalId = checkNotNull(uploadedAssetId)
         val newId = checkNotNull(replacementAssetId)
+        val original = checkNotNull(originalAssetInfo)
 
         val originalResponse = client.getAssetInfo(immichApiKey, originalId)
         assertEquals(200, originalResponse.status, "Could not fetch original asset")
-
         val originalAsset = originalResponse.readEntity(AssetResponseDto::class.java)
         assertTrue(originalAsset.isTrashed, "Original asset should be trashed")
 
-        // ///
         val newResponse = client.getAssetInfo(immichApiKey, newId)
         assertEquals(200, newResponse.status, "Could not fetch replacement asset")
-
         val newAsset = newResponse.readEntity(AssetResponseDto::class.java)
         assertFalse(newAsset.isTrashed, "Replacement asset should not be trashed")
+
+        assertEquals(
+            original.fileModifiedAt,
+            newAsset.fileModifiedAt,
+            "Replacement should have same fileModifiedAt as original",
+        )
+        assertEquals(
+            original.isFavorite,
+            newAsset.isFavorite,
+            "Replacement should have same isFavorite as original",
+        )
+        assertEquals(
+            original.isArchived,
+            newAsset.isArchived,
+            "Replacement should have same isArchived as original",
+        )
+
+        val tagNames = newAsset.tags.map { it.name }
+        assertTrue(
+            tagNames.contains(IMMICH_COMPACTOR_TAG_NAME),
+            "Replacement should be tagged with $IMMICH_COMPACTOR_TAG_NAME, got tags: $tagNames",
+        )
     }
 }

@@ -2,8 +2,6 @@
 
 class Main {
     /*
-     * TODO:
-     *  - Turn off the tag feature, does it still work ?
      * TODO Not easy to fix:
      *  - The user needs to delete all assets from device, otherwise the Immich app will upload them again
      *  -- Or: turn ON Advanced :: Sync Remote deletions
