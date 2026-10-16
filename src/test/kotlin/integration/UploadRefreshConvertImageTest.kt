@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 
 @QuarkusTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
-class UploadRefreshConvertTest {
+class UploadRefreshConvertImageTest {
     @Inject
     lateinit var immichService: ImmichService
 
@@ -91,7 +91,7 @@ class UploadRefreshConvertTest {
         val userInfo =
             QuarkusTransaction
                 .requiringNew()
-                .call { userInfoRepository.listAll().first() }
+                .call { userInfoRepository.listAll().single() }
 
         val result = immichService.findAndEnqueueAllAssets(client, userInfo)
 
@@ -121,7 +121,7 @@ class UploadRefreshConvertTest {
     @Order(4)
     fun `convert the asset`() {
         val assetId = checkNotNull(uploadedAssetId) { "No uploaded asset id" }
-        val userInfo = userInfoRepository.listAll().first()
+        val userInfo = userInfoRepository.listAll().single()
 
         val result = assetConversionService.processQueuedAsset(userInfo.id, assetId)
 
