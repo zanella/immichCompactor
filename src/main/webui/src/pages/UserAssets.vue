@@ -88,10 +88,9 @@
               v-for="(asset, index) in queuedData.assets"
               :key="asset.assetId"
               class="border-b border-gray-100 hover:bg-gray-50"
-              :class="{ 'opacity-40 pointer-events-none select-none': convertResults.has(asset.assetId) && convertResults.get(asset.assetId)?.status === 'removed' }"
             >
               <td class="py-2 px-3 text-gray-400 text-xs">{{ (queuedData.page - 1) * queuedData.size + index + 1 }}</td>
-              <td class="py-2 px-3 font-mono text-xs text-gray-700" :class="{ 'line-through': convertResults.has(asset.assetId) }">
+              <td class="py-2 px-3 font-mono text-xs text-gray-700" :class="{ 'line-through': convertResults.has(asset.assetId) && convertResults.get(asset.assetId)?.status === 'converted' }">
                 {{ asset.assetId }}
               </td>
               <td class="py-2 px-3">
@@ -111,10 +110,10 @@
                       class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full"
                       :class="{
                         'bg-green-100 text-green-800': convertResults.get(asset.assetId)?.status === 'converted',
-                        'bg-gray-100 text-gray-600': convertResults.get(asset.assetId)?.status === 'removed',
+                        'bg-amber-100 text-amber-800': convertResults.get(asset.assetId)?.status === 'skipped',
                         'bg-red-100 text-red-800': convertResults.get(asset.assetId)?.status === 'error',
                       }">
-                  {{ convertResults.get(asset.assetId)?.status === 'converted' ? 'Converted' : convertResults.get(asset.assetId)?.status === 'removed' ? 'Removed' : 'Error' }}
+                  {{ convertResults.get(asset.assetId)?.status === 'converted' ? 'Converted' : convertResults.get(asset.assetId)?.status === 'skipped' ? 'Skipped' : 'Error' }}
                 </span>
                 <span v-else
                       class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full"
@@ -135,6 +134,13 @@
                       target="_blank" rel="noopener noreferrer"
                       class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 transition-colors whitespace-nowrap"
                     >View new</a>
+                  </template>
+                  <template v-else-if="convertResults.has(asset.assetId) && convertResults.get(asset.assetId)?.status === 'skipped'">
+                    <a
+                      :href="`${convertResults.get(asset.assetId)?.immichServerUrl}/photos/${asset.assetId}`"
+                      target="_blank" rel="noopener noreferrer"
+                      class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                    >View</a>
                   </template>
                   <template v-else-if="!convertResults.has(asset.assetId)">
                     <a

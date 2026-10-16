@@ -84,7 +84,9 @@ class UserResource(
         @PathParam("assetId") assetId: UUID,
     ): ConvertResultResponse =
         try {
-            when (val result = assetConversionService.processQueuedAsset(UserId.from(rawUserId), assetId)) {
+            val userId = UserId.from(rawUserId)
+
+            when (val result = assetConversionService.processQueuedAsset(userId, assetId)) {
                 is CustomEither.Left ->
                     ConvertResultResponse(
                         status = "converted",
@@ -94,7 +96,15 @@ class UserResource(
                                 .trimEnd('/'),
                     )
                 is CustomEither.Right ->
-                    return ConvertResultResponse(status = "removed", error = result.value)
+                    ConvertResultResponse(
+                        status = "skipped",
+                        error = result.value,
+                        immichServerUrl =
+                            userInfoService
+                                .userDetails(userId)
+                                .userInfo.immichServerUrl
+                                .trimEnd('/'),
+                    )
             }
         } catch (e: Exception) {
             ConvertResultResponse(status = "error", error = e.message)
