@@ -1,35 +1,49 @@
 package integration
 
-import io.quarkus.test.common.http.TestHTTPResource
-import io.quarkus.test.junit.QuarkusIntegrationTest
+import database.AssetStagingAreaRepository
+import database.UserInfoRepository
+import integration.immich.AssetMediaStatus
+import integration.immich.AssetResponseDto
+import integration.immich.ImmichClient
+import io.quarkus.narayana.jta.QuarkusTransaction
+import io.quarkus.test.junit.QuarkusTest
+import jakarta.inject.Inject
+import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestMethodOrder
-import java.io.ByteArrayOutputStream
+import services.AssetConversionService
+import services.ImmichService
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URI
-import java.net.URL
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-@QuarkusIntegrationTest
+@QuarkusTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class UploadRefreshConvertTest {
-    @TestHTTPResource
-    lateinit var appUrl: URL
+    @Inject
+    lateinit var immichService: ImmichService
+
+    @Inject
+    lateinit var userInfoRepository: UserInfoRepository
+
+    @Inject
+    lateinit var assetStagingAreaRepository: AssetStagingAreaRepository
+
+    @Inject
+    lateinit var assetConversionService: AssetConversionService
 
     private val immichBaseUrl = ImmichTestEnvironment.baseUrl
     private val immichApiKey = ImmichTestEnvironment.apiKey
+    private val client: ImmichClient by lazy { immichService.instantiateClient(immichBaseUrl) }
 
     companion object {
         private var uploadedAssetId: UUID? = null
         private var replacementAssetId: UUID? = null
-        private var userId: Int? = null
     }
 
     @Test
@@ -39,104 +53,84 @@ class UploadRefreshConvertTest {
             File("src/test/resources/assets/first_screenshot.png")
                 .also { require(it.exists()) { "Test asset not found: ${it.absolutePath}" } }
 
-        val boundary = "----IntegrationTestBoundary${System.currentTimeMillis()}"
-        val body = buildMultipartBody(screenshotFile, boundary)
+        val multipartForm =
+            ClientMultipartForm
+                .create()
+                .binaryFileUpload("assetData", screenshotFile.name, screenshotFile.absolutePath, "image/png")
+                .attribute("deviceAssetId", "${screenshotFile.name}-test", "")
+                .attribute("deviceId", "immich-compactor-test", "")
+                .attribute("fileCreatedAt", "2025-01-01T00:00:00.000Z", "")
+                .attribute("fileModifiedAt", "2025-01-01T00:00:00.000Z", "")
 
-        val url = URI.create("$immichBaseUrl/api/assets").toURL()
-        val connection = url.openConnection() as HttpURLConnection
-        connection.requestMethod = "POST"
-        connection.setRequestProperty("x-api-key", immichApiKey)
-        connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-        connection.doOutput = true
-        connection.outputStream.use { it.write(body) }
+        val response = client.uploadAsset(immichApiKey, multipartForm)
 
-        val responseCode = connection.responseCode
-        val responseBody = connection.inputStream.bufferedReader().readText()
-
-        assertEquals(201, responseCode, "Upload failed: $responseBody")
-
-        val idMatch = Regex(""""id"\s*:\s*"([^"]+)"""").find(responseBody)
-        uploadedAssetId =
-            checkNotNull(idMatch?.groupValues?.get(1)?.let(UUID::fromString)) {
-                "Could not extract asset id"
-            }
+        assertEquals(AssetMediaStatus.CREATED, response.status, "Upload did not create asset")
+        uploadedAssetId = response.id
+        assertNotNull(uploadedAssetId, "Uploaded asset id should not be null")
     }
 
     @Test
     @Order(2)
-    fun `register user and trigger refresh`() {
-        val registerBody =
-            """{"name":"Test User","immichServerUrl":"$immichBaseUrl","apiKey":"$immichApiKey"}"""
+    fun `register user and refresh assets`() {
+        val tagId = immichService.upsertTag(immichApiKey, client).id
 
-        val registerUrl = URI.create("$appUrl/api/users").toURL()
-        val registerConnection = registerUrl.openConnection() as HttpURLConnection
-        registerConnection.requestMethod = "POST"
-        registerConnection.setRequestProperty("Content-Type", "application/json")
-        registerConnection.doOutput = true
-        registerConnection.outputStream.use { it.write(registerBody.toByteArray()) }
+        QuarkusTransaction.requiringNew().run {
+            assetStagingAreaRepository.deleteAll()
+            userInfoRepository.deleteAll()
 
-        val registerCode = registerConnection.responseCode
-        val registerResponseBody = registerConnection.inputStream.bufferedReader().readText()
-
-        assertEquals(200, registerCode, "User registration failed: $registerResponseBody")
-
-        userId = registerResponseBody.trim().toIntOrNull()
-        assertNotNull(userId, "Expected user ID in response body, got: $registerResponseBody")
-
-        val refreshUrl = URI.create("$appUrl/api/users/$userId/assets/refresh").toURL()
-        val refreshConnection = refreshUrl.openConnection() as HttpURLConnection
-        refreshConnection.requestMethod = "POST"
-        val refreshCode = refreshConnection.responseCode
-        val refreshBody = refreshConnection.inputStream.bufferedReader().readText()
-
-        assertEquals(200, refreshCode, "Refresh failed: $refreshBody")
-
-        repeat(30) {
-            val statusUrl = URI.create("$appUrl/api/users/$userId/assets/status").toURL()
-            val statusConnection = statusUrl.openConnection() as HttpURLConnection
-            statusConnection.requestMethod = "GET"
-            val statusBody = statusConnection.inputStream.bufferedReader().readText()
-
-            if (statusBody.contains("\"DONE\"") || statusBody.contains("\"FAILED\"")) {
-                assertTrue(statusBody.contains("\"DONE\""), "Refresh job failed: $statusBody")
-                return@repeat
-            }
-
-            Thread.sleep(2000)
+            database
+                .UserInfo(
+                    apiKey = immichApiKey,
+                    name = "Test User",
+                    immichServerUrl = immichBaseUrl,
+                    _tagUUID = tagId.toString(),
+                ).also { userInfoRepository.persist(it) }
         }
+
+        val userInfo =
+            QuarkusTransaction
+                .requiringNew()
+                .call { userInfoRepository.listAll().first() }
+
+        val result = immichService.findAndEnqueueAllAssets(client, userInfo)
+
+        assertTrue(result.assetsFound > 0, "Expected at least 1 asset found, got: $result")
+        assertTrue(result.assetsQueued > 0, "Expected at least 1 asset queued, got: $result")
     }
 
     @Test
     @Order(3)
     fun `assert one IMAGE entry in DB after refresh`() {
-        val queuedUrl = URI.create("$appUrl/api/users/$userId/assets/queued").toURL()
-        val queuedConnection = queuedUrl.openConnection() as HttpURLConnection
-        queuedConnection.requestMethod = "GET"
-        val queuedBody = queuedConnection.inputStream.bufferedReader().readText()
+        val stagedAssets = assetStagingAreaRepository.listAll()
 
-        assertTrue(queuedBody.contains("\"total\":1"), "Expected exactly 1 queued asset, got: $queuedBody")
-        assertTrue(queuedBody.contains("\"IMAGE\""), "Expected IMAGE content type, got: $queuedBody")
-        assertTrue(queuedBody.contains("\"QUEUED\""), "Expected QUEUED state, got: $queuedBody")
+        assertEquals(1, stagedAssets.size, "Expected exactly 1 staged asset, got: ${stagedAssets.size}")
+        assertEquals(
+            services.ContentType.IMAGE,
+            stagedAssets.first().contentType,
+            "Expected IMAGE content type",
+        )
+        assertEquals(
+            database.AssetConversionState.QUEUED,
+            stagedAssets.first().currentState,
+            "Expected QUEUED state",
+        )
     }
 
     @Test
     @Order(4)
     fun `convert the asset`() {
         val assetId = checkNotNull(uploadedAssetId) { "No uploaded asset id" }
+        val userInfo = userInfoRepository.listAll().first()
 
-        val convertUrl = URI.create("$appUrl/api/users/$userId/assets/$assetId/convert").toURL()
-        val convertConnection = convertUrl.openConnection() as HttpURLConnection
-        convertConnection.requestMethod = "POST"
+        val result = assetConversionService.processQueuedAsset(userInfo.id, assetId)
 
-        val convertCode = convertConnection.responseCode
-        val convertBody = convertConnection.inputStream.bufferedReader().readText()
+        assertTrue(
+            result is internal.lang.CustomEither.Left,
+            "Expected conversion to succeed, got: $result",
+        )
 
-        assertEquals(200, convertCode, "Convert failed: $convertBody")
-        assertTrue(convertBody.contains("\"converted\""), "Expected conversion to succeed, got: $convertBody")
-
-        val newAssetIdMatch = Regex(""""newAssetId"\s*:\s*"([^"]+)"""").find(convertBody)
-        replacementAssetId = newAssetIdMatch?.groupValues?.get(1)?.let(UUID::fromString)
-        assertNotNull(replacementAssetId, "Expected a replacement asset id in: $convertBody")
+        replacementAssetId = (result as internal.lang.CustomEither.Left).value.second
+        assertNotNull(replacementAssetId, "Expected a replacement asset id")
     }
 
     @Test
@@ -145,54 +139,14 @@ class UploadRefreshConvertTest {
         val originalId = checkNotNull(uploadedAssetId)
         val newId = checkNotNull(replacementAssetId)
 
-        val originalUrl = URI.create("$immichBaseUrl/api/assets/$originalId").toURL()
-        val originalConnection = originalUrl.openConnection() as HttpURLConnection
-        originalConnection.setRequestProperty("x-api-key", immichApiKey)
-        originalConnection.requestMethod = "GET"
+        val originalResponse = client.getAssetInfo(immichApiKey, originalId)
+        assertEquals(200, originalResponse.status, "Could not fetch original asset")
+        val originalAsset = originalResponse.readEntity(AssetResponseDto::class.java)
+        assertTrue(originalAsset.isTrashed, "Original asset should be trashed")
 
-        val originalCode = originalConnection.responseCode
-        val originalBody = originalConnection.inputStream.bufferedReader().readText()
-
-        assertEquals(200, originalCode, "Could not fetch original asset: $originalBody")
-        assertTrue(originalBody.contains("\"isTrashed\":true"), "Original asset should be trashed: $originalBody")
-
-        val newUrl = URI.create("$immichBaseUrl/api/assets/$newId").toURL()
-        val newConnection = newUrl.openConnection() as HttpURLConnection
-        newConnection.setRequestProperty("x-api-key", immichApiKey)
-        newConnection.requestMethod = "GET"
-
-        val newCode = newConnection.responseCode
-        val newBody = newConnection.inputStream.bufferedReader().readText()
-
-        assertEquals(200, newCode, "Could not fetch replacement asset: $newBody")
-        assertFalse(newBody.contains("\"isTrashed\":true"), "Replacement should not be trashed: $newBody")
-    }
-
-    private fun buildMultipartBody(
-        file: File,
-        boundary: String,
-    ): ByteArray {
-        val baos = ByteArrayOutputStream()
-
-        baos.write("--$boundary\r\n".toByteArray())
-        baos.write("Content-Disposition: form-data; name=\"assetData\"; filename=\"${file.name}\"\r\n".toByteArray())
-        baos.write("Content-Type: image/png\r\n\r\n".toByteArray())
-        file.inputStream().use { it.copyTo(baos) }
-        baos.write("\r\n".toByteArray())
-
-        listOf(
-            "deviceAssetId" to "test-device-asset-id",
-            "deviceId" to "test-device",
-            "fileCreatedAt" to "2025-01-01T00:00:00.000Z",
-            "fileModifiedAt" to "2025-01-01T00:00:00.000Z",
-        ).forEach { (name, value) ->
-            baos.write("--$boundary\r\n".toByteArray())
-            baos.write("Content-Disposition: form-data; name=\"$name\"\r\n\r\n".toByteArray())
-            baos.write("$value\r\n".toByteArray())
-        }
-
-        baos.write("--$boundary--\r\n".toByteArray())
-
-        return baos.toByteArray()
+        val newResponse = client.getAssetInfo(immichApiKey, newId)
+        assertEquals(200, newResponse.status, "Could not fetch replacement asset")
+        val newAsset = newResponse.readEntity(AssetResponseDto::class.java)
+        assertFalse(newAsset.isTrashed, "Replacement asset should not be trashed")
     }
 }
