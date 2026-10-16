@@ -190,8 +190,13 @@ paths:
               $ref: "#/components/schemas/UserAddParams"
         required: true
       responses:
-        "201":
-          description: Created
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+                format: int32
         "400":
           description: Bad Request
       summary: Upsert User

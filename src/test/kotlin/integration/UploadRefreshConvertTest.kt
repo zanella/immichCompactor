@@ -20,6 +20,7 @@ import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @QuarkusTest
@@ -148,5 +149,15 @@ class UploadRefreshConvertTest {
         assertEquals(200, newResponse.status, "Could not fetch replacement asset")
         val newAsset = newResponse.readEntity(AssetResponseDto::class.java)
         assertFalse(newAsset.isTrashed, "Replacement asset should not be trashed")
+    }
+
+    @Test
+    @Order(6)
+    fun `fetch non-existent asset returns null`() {
+        val bogusId = UUID.fromString("ffffffff-ffff-4fff-8fff-ffffffffffff")
+
+        val result = immichService.getAssetInfo(immichApiKey, bogusId, client)
+
+        assertNull(result, "Expected null for non-existent asset")
     }
 }

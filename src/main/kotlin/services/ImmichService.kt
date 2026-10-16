@@ -64,9 +64,16 @@ class ImmichService(
         assetId: UUID,
         client: ImmichClient,
     ): AssetResponseDto? {
-        val response = client.getAssetInfo(apiKey, assetId)
+        val response =
+            try {
+                client.getAssetInfo(apiKey, assetId)
+            } catch (e: jakarta.ws.rs.WebApplicationException) {
+                if (e.response.status == 400) {
+                    return null
+                }
+                throw e
+            }
 
-        // TODO: Immich returns 400, instead of 404, if the asset is not found...
         if (response.status == 400) {
             return null
         } else if (response.status != 200) {

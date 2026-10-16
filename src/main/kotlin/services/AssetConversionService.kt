@@ -188,8 +188,13 @@ class AssetConversionService(
                     }
                 }
 
-            // TODO: get from the actual converted file
-            val mediaType = MediaType.valueOf("video/mp4")
+            val mediaType =
+                when (fileType) {
+                    HandledContentType.UNHANDLED_IMAGE -> TODO()
+                    UNKNOWN -> TODO()
+                    HandledContentType.IMAGE_TO_JPEG_XL -> MediaType.valueOf("image/jxl")
+                    HandledContentType.VIDEO_TO_H265 -> MediaType.valueOf("video/mp4")
+                }
 
             // Upload the converted asset
             immichService
