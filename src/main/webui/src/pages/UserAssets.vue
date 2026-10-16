@@ -90,7 +90,7 @@
               class="border-b border-gray-100 hover:bg-gray-50"
             >
               <td class="py-2 px-3 text-gray-400 text-xs">{{ (queuedData.page - 1) * queuedData.size + index + 1 }}</td>
-              <td class="py-2 px-3 font-mono text-xs text-gray-700" :class="{ 'line-through': convertResults.has(asset.assetId) && convertResults.get(asset.assetId)?.status === 'converted' }">
+              <td class="py-2 px-3 font-mono text-xs text-gray-700" :class="{ 'line-through': convertResults.has(asset.assetId) && (convertResults.get(asset.assetId)?.status === 'converted' || convertResults.get(asset.assetId)?.status === 'skipped') }">
                 {{ asset.assetId }}
               </td>
               <td class="py-2 px-3">
@@ -110,7 +110,7 @@
                       class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full"
                       :class="{
                         'bg-green-100 text-green-800': convertResults.get(asset.assetId)?.status === 'converted',
-                        'bg-amber-100 text-amber-800': convertResults.get(asset.assetId)?.status === 'skipped',
+                        'bg-gray-100 text-gray-600': convertResults.get(asset.assetId)?.status === 'skipped',
                         'bg-red-100 text-red-800': convertResults.get(asset.assetId)?.status === 'error',
                       }">
                   {{ convertResults.get(asset.assetId)?.status === 'converted' ? 'Converted' : convertResults.get(asset.assetId)?.status === 'skipped' ? 'Skipped' : 'Error' }}
