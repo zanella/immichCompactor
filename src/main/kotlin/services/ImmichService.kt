@@ -19,9 +19,9 @@ import integration.immich.SearchAssetsResponse
 import integration.immich.TagResponseDto
 import io.quarkus.logging.Log
 import io.quarkus.narayana.jta.QuarkusTransaction
+import io.quarkus.rest.client.reactive.QuarkusRestClientBuilder
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.MediaType
-import org.eclipse.microprofile.rest.client.RestClientBuilder
 import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
 import java.io.File
 import java.io.InputStream
@@ -47,10 +47,9 @@ class ImmichService(
             baseUrl: String,
             isDebug: Boolean = true,
         ): ImmichClient =
-            RestClientBuilder
+            QuarkusRestClientBuilder
                 .newBuilder()
                 .baseUri(URI.create(baseUrl))
-                .property("microprofile.rest.client.disable.default.mapper", true)
                 .also {
                     if (isDebug) {
                         it.property("quarkus.rest-client.logging.scope", "request-response")

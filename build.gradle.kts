@@ -77,4 +77,5 @@ allOpen {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("quarkus.profile", "test")
 }

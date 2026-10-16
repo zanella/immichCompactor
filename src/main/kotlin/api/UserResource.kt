@@ -36,7 +36,7 @@ class UserResource(
 
     @POST
     @Produces(APPLICATION_JSON)
-    fun upsertUser(dto: UserAddParams): Unit = userInfoService.upsertUser(dto)
+    fun upsertUser(dto: UserAddParams): Int = userInfoService.upsertUser(dto)
 
     @GET
     @Path("/{id}")

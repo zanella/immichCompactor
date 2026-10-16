@@ -35,7 +35,7 @@ object ImmichTestEnvironment {
             .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1))
 
     val immich: GenericContainer<*> =
-        GenericContainer("ghcr.io/immich-app/immich-server:v3")
+        GenericContainer("ghcr.io/immich-app/immich-server:release")
             .withNetwork(network)
             .withEnv("DB_HOSTNAME", "database")
             .withEnv("DB_USERNAME", DB_USERNAME)

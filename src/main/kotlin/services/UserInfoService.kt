@@ -27,7 +27,7 @@ class UserInfoService(
 ) {
     fun listUsers(): List<UserInfo> = userInfoRepository.listAll()
 
-    fun upsertUser(dto: UserAddParams) =
+    fun upsertUser(dto: UserAddParams): Int =
         with(dto) {
             // Validate the supplied API key against the supplied server, before touching the DB.
             if (!isApiKeyValid(immichServerUrl, apiKey)) {
@@ -43,23 +43,28 @@ class UserInfoService(
             val tagId = immichService.upsertTag(apiKey, ImmichClient.instantiateClient(immichServerUrl)).id
 
             // Only now open a transaction to persist the change (flushed on commit).
-            QuarkusTransaction.requiringNew().run {
+            return QuarkusTransaction.requiringNew().call {
                 if (id == null) {
-                    userInfoRepository
-                        .persist(
-                            UserInfo(
-                                apiKey = apiKey,
-                                name = name,
-                                immichServerUrl = immichServerUrl,
-                                _tagUUID = tagId.toString(),
-                            ),
+                    val user =
+                        UserInfo(
+                            apiKey = apiKey,
+                            name = name,
+                            immichServerUrl = immichServerUrl,
+                            _tagUUID = tagId.toString(),
                         )
+
+                    userInfoRepository.persist(user)
+                    userInfoRepository.flush()
+
+                    user.id.value
                 } else {
                     userInfoRepository.getById(id).also {
                         it.name = name
                         it.immichServerUrl = immichServerUrl
                         it.apiKey = apiKey
                     }
+
+                    id
                 }
             }
         }
