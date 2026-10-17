@@ -140,4 +140,27 @@ class UploadRefreshConvertNonCompressibleVideoTest {
         val originalAsset = originalResponse.readEntity(AssetResponseDto::class.java)
         assertFalse(originalAsset.isTrashed, "Original asset should not be trashed when not improvable")
     }
+
+    @Test
+    @Order(6)
+    fun `KEEP_AS_IS asset is not re-enqueued on second refresh`() {
+        val assetId = checkNotNull(uploadedAssetId)
+        val userInfo = userInfoRepository.listAll().single()
+
+        val result = immichService.findAndEnqueueAllAssets(client, userInfo)
+
+        assertEquals(0L, result.assetsQueued, "KEEP_AS_IS asset should not be re-enqueued, got: $result")
+
+        val stagedAssets =
+            assetStagingAreaRepository
+                .listAll()
+                .filter { it.assetId == assetId }
+
+        assertEquals(1, stagedAssets.size, "Expected exactly 1 staged asset, got: ${stagedAssets.size}")
+        assertEquals(
+            AssetConversionState.KEEP_AS_IS,
+            stagedAssets.single().currentState,
+            "Asset should still be in KEEP_AS_IS state",
+        )
+    }
 }
