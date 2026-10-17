@@ -21,8 +21,10 @@ import internal.lang.CustomEither
 import internal.lang.runCatchingSafely
 import io.quarkus.logging.Log
 import io.quarkus.narayana.jta.QuarkusTransaction
+import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.enterprise.event.Observes
 import jakarta.transaction.Transactional
 import jakarta.ws.rs.core.MediaType
 import services.HandledContentType.UNKNOWN
@@ -48,23 +50,29 @@ class AssetConversionService(
                 .also { it.deleteOnExit() }
     }
 
-    fun processQueuedAssets(
-        userId: UserId,
-        queuedAssetsId: Set<UUID>,
-        queuedAssetsContentTypes: Set<ContentType> = emptySet(),
+    fun onResume(
+        @Observes event: StartupEvent,
     ) {
-        /* val stagedAssetsIds = QuarkusTransaction.joiningExisting().call {
-            assetStagingAreaRepository
-                    .listAll()
-                    // TODO: filter on DB query, instead of return
-                    .filter { it.currentState == AssetConversionStates.QUEUED }
-                    .map { it.assetId }
-                    .toSet()
-        }
+        val stuckAssets =
+            QuarkusTransaction
+                .requiringNew()
+                .call {
+                    assetStagingAreaRepository
+                        .find("currentState != ?1 and currentState != ?2", QUEUED, KEEP_AS_IS)
+                        .list()
+                        .map { it.userId to it.assetId }
+                }
 
-        queuedAssetsId.forEach { assetId ->
-            processQueuedAsset(client, userInfo, assetId, queuedAssetsContentTypes)
-        } */
+        if (stuckAssets.isEmpty()) return
+
+        Log.info("Resuming ${stuckAssets.size} stuck asset(s) on startup")
+
+        Thread.ofVirtual().start {
+            stuckAssets.forEach { (userId, assetId) ->
+                runCatchingSafely { processQueuedAsset(userId, assetId) }
+                    .onFailure { e -> Log.error("Failed to resume asset $assetId: ${e.message}") }
+            }
+        }
     }
 
     fun processQueuedAsset(

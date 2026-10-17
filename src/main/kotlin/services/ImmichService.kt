@@ -130,9 +130,8 @@ class ImmichService(
             QuarkusTransaction.joiningExisting().call {
                 // TODO: If the amount is huge -> think how to handle
                 assetStagingAreaRepository
-                    .listAll()
-                    // TODO: filter on DB query, instead of return
-                    .filter { it.currentState != AssetConversionState.WAITING_DELETION }
+                    .find("currentState != ?1", AssetConversionState.WAITING_DELETION)
+                    .list()
                     .map { it.assetId }
                     .toSet()
             }
