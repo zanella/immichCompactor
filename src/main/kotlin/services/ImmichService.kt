@@ -67,8 +67,8 @@ class ImmichService(
         val response =
             try {
                 client.getAssetInfo(apiKey, assetId)
-            } catch (e: jakarta.ws.rs.WebApplicationException) {
-                if (e.response.status == 400) {
+            } catch (e: Throwable) {
+                if (e.message?.contains("400") == true || e.message?.contains("Bad Request") == true) {
                     return null
                 }
                 throw e
@@ -243,7 +243,7 @@ class ImmichService(
     ) = client.copyAsset(
         apiKey,
         CopyAssetRequest(
-            albums = true,
+            albums = false,
             favorite = true,
             sharedLinks = true,
             sidecar = true,

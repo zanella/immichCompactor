@@ -45,3 +45,10 @@ data class DeleteAssetsRequest(
     val ids: List<UUID>, // List of Asset UUIDs to delete
     val force: Boolean, // Force delete even if in use (e.g., inside an album)
 )
+
+@Serializable
+data class BulkIdResponseDto(
+    val id: UUID,
+    val success: Boolean,
+    val error: String? = null,
+)

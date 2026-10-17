@@ -258,18 +258,14 @@ class AssetConversionService(
         stagedAsset: StagedAsset,
     ): CustomEither<Pair<UserInfo, UUID>, String> =
         with(ctx) {
-            // TODO: receive option to HARD-delete
+            client.deleteAssets(
+                userInfo.apiKey,
+                DeleteAssetsRequest(ids = listOf(stagedAsset.assetId), force = false),
+            )
 
-            // Send original asset to trash
-            client
-                .deleteAssets(
-                    userInfo.apiKey,
-                    DeleteAssetsRequest(ids = listOf(stagedAsset.assetId), force = false),
-                ).also {
-                    QuarkusTransaction.joiningExisting().call {
-                        assetStagingAreaRepository.dropById(stagedAsset.assetId)
-                    }
-                }
+            QuarkusTransaction.joiningExisting().call {
+                assetStagingAreaRepository.dropById(stagedAsset.assetId)
+            }
 
             return CustomEither.Left(userInfo to requireNotNull(stagedAsset.replacementId))
         }
