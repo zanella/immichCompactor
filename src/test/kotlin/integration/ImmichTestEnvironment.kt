@@ -34,6 +34,7 @@ object ImmichTestEnvironment {
             .withExposedPorts(6379)
             .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1))
 
+    @Suppress("DEPRECATION")
     val immich: GenericContainer<*> =
         GenericContainer("ghcr.io/immich-app/immich-server:release")
             .withNetwork(network)

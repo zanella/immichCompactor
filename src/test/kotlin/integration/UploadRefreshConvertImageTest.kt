@@ -168,6 +168,21 @@ class UploadRefreshConvertImageTest {
 
     @Test
     @Order(6)
+    fun `trashed asset appears in trash search results`() {
+        val originalId = checkNotNull(uploadedAssetId)
+        val userInfo = userInfoRepository.listAll().single()
+
+        val trashedAssets = immichService.findTrashedAssets(client, userInfo)
+
+        val trashedIds = trashedAssets.assets.items.map { it.id }
+        assertTrue(
+            trashedIds.contains(originalId),
+            "Trashed original should appear in trash search results, got: $trashedIds",
+        )
+    }
+
+    @Test
+    @Order(7)
     fun `fetch non-existent asset returns null`() {
         val bogusId = UUID.fromString("ffffffff-ffff-4fff-8fff-ffffffffffff")
 

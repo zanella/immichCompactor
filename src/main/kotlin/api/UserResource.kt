@@ -19,6 +19,7 @@ import kotlinx.serialization.UseSerializers
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter
 import services.AssetConversionService
 import services.AssetRefreshJobService
+import services.ImmichService
 import services.UserDetails
 import services.UserInfoService
 import services.UserInfoService.Companion.UserAddParams
@@ -28,6 +29,7 @@ import java.util.UUID
 class UserResource(
     private val assetConversionService: AssetConversionService,
     private val assetRefreshJobService: AssetRefreshJobService,
+    private val immichService: ImmichService,
     private val userInfoService: UserInfoService,
 ) {
     @GET
@@ -75,6 +77,23 @@ class UserResource(
     ): QueuedAssetsResponse =
         userInfoService
             .userQueuedAssets(UserId.from(rawUserId), page, size, contentTypes)
+
+    @GET
+    @Path("/{id}/assets/trashed")
+    @Produces(APPLICATION_JSON)
+    fun trashedAssets(
+        @PathParam("id") rawUserId: String,
+    ): integration.immich.SearchAssetsResponse {
+        val userInfo =
+            UserId
+                .from(rawUserId)
+                .let(userInfoService::userDetails)
+                .userInfo
+
+        val client = immichService.instantiateClient(userInfo.immichServerUrl)
+
+        return immichService.findTrashedAssets(client, userInfo)
+    }
 
     @POST
     @Path("/{id}/assets/{assetId}/convert")

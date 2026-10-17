@@ -15,7 +15,8 @@ data class SearchAssetsRequest(
     companion object {
         @Serializable
         data class SearchFilter(
-            val tagIds: IdsFilter,
+            val tagIds: IdsFilter? = null,
+            val trashedAt: DateFilterNullable? = null,
         ) {
             companion object {
                 @Serializable
@@ -26,6 +27,16 @@ data class SearchAssetsRequest(
                 )
             }
         }
+
+        @Serializable
+        data class DateFilterNullable(
+            val eq: String? = null,
+            val gt: String? = null,
+            val gte: String? = null,
+            val lt: String? = null,
+            val lte: String? = null,
+            val ne: String? = null,
+        )
     }
 }
 
@@ -64,6 +75,7 @@ data class AssetResponseDto(
     val isTrashed: Boolean,
     val libraryId: UUID? = null,
     val originalFileName: String,
+    val originalMimeType: String? = null,
     val originalPath: String? = null,
     val ownerId: UUID,
     val tags: List<TagResponseDto> = emptyList(),

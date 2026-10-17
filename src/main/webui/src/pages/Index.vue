@@ -29,6 +29,12 @@
         >
           Assets
         </router-link>
+        <router-link
+          :to="`/users/${user._id}/trash`"
+          class="px-4 py-1 bg-gray-600 text-white text-sm font-semibold rounded-md hover:bg-gray-700 transition-colors"
+        >
+          Trash
+        </router-link>
       </div>
     </div>
   </div>

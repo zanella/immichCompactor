@@ -13,6 +13,7 @@ import integration.immich.IMMICH_COMPACTOR_TAG_NAME
 import integration.immich.ImmichClient
 import integration.immich.ImmichLoggingFilter
 import integration.immich.SearchAssetsRequest
+import integration.immich.SearchAssetsRequest.Companion.DateFilterNullable
 import integration.immich.SearchAssetsRequest.Companion.SearchFilter
 import integration.immich.SearchAssetsRequest.Companion.SearchFilter.Companion.IdsFilter
 import integration.immich.SearchAssetsResponse
@@ -95,6 +96,26 @@ class ImmichService(
                         tagIds =
                             IdsFilter(
                                 none = listOf(userInfo.tagId),
+                            ),
+                    ),
+                cursor = cursor,
+            )
+
+        return client.searchByMetadata(userInfo.apiKey, searchCriteria)
+    }
+
+    fun findTrashedAssets(
+        client: ImmichClient,
+        userInfo: UserInfo,
+        cursor: String? = null,
+    ): SearchAssetsResponse {
+        val searchCriteria =
+            SearchAssetsRequest(
+                filter =
+                    SearchFilter(
+                        trashedAt =
+                            DateFilterNullable(
+                                gte = "1970-01-01T00:00:00.000Z",
                             ),
                     ),
                 cursor = cursor,

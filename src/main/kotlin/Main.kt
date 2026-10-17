@@ -13,10 +13,9 @@ class Main {
      * TODO:
      *  - Ensure only one conversion request is handled at a time: mutex
      *  - handle assets with UNKNOWN type
-     *
-     * Test this hypothesis, if the new asset has almost the same name, e.g. original = blah.MP4, new =
-      blah.mp4, then Immich does not show the original on the trash, even if it's marked for deletion
-     *
+     *  - There's smth special about the videos from an iPhone: when one gets replaced, Immich doesn't show them
+     *      on the trash page, but, if you go directly to one of them you get the option to delete permanently,
+     *      meaning: they are marked as deleted, no idea why they don't show up on the trash then...
      */
     fun run(vararg args: String?): Int = 0
 }

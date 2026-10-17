@@ -29,6 +29,84 @@ components:
           anyOf:
           - $ref: "#/components/schemas/Instant"
           - type: "null"
+    AssetResponseDto:
+      type: object
+      required:
+      - checksum
+      - createdAt
+      - fileCreatedAt
+      - fileModifiedAt
+      - hasMetadata
+      - id
+      - isArchived
+      - isEdited
+      - isFavorite
+      - isOffline
+      - isTrashed
+      - originalFileName
+      - ownerId
+      properties:
+        checksum:
+          type: string
+        createdAt:
+          type: string
+        duplicateId:
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
+        duration:
+          type:
+          - integer
+          - "null"
+          format: int32
+        fileCreatedAt:
+          type: string
+        fileModifiedAt:
+          type: string
+        hasMetadata:
+          type: boolean
+        height:
+          type:
+          - integer
+          - "null"
+          format: int32
+        id:
+          $ref: "#/components/schemas/UUID"
+        isArchived:
+          type: boolean
+        isEdited:
+          type: boolean
+        isFavorite:
+          type: boolean
+        isOffline:
+          type: boolean
+        isTrashed:
+          type: boolean
+        libraryId:
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
+        originalFileName:
+          type: string
+        originalMimeType:
+          type:
+          - string
+          - "null"
+        originalPath:
+          type:
+          - string
+          - "null"
+        ownerId:
+          $ref: "#/components/schemas/UUID"
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/TagResponseDto"
+        width:
+          type:
+          - integer
+          - "null"
+          format: int32
     ConvertResultResponse:
       type: object
       required:
@@ -96,6 +174,34 @@ components:
           type: array
           items:
             type: string
+    SearchAssetResponseDto:
+      type: object
+      required:
+      - count
+      - items
+      - total
+      properties:
+        count:
+          type: integer
+          format: int32
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetResponseDto"
+        nextCursor:
+          type:
+          - string
+          - "null"
+        total:
+          type: integer
+          format: int32
+    SearchAssetsResponse:
+      type: object
+      required:
+      - assets
+      properties:
+        assets:
+          $ref: "#/components/schemas/SearchAssetResponseDto"
     StagedAssetDto:
       type: object
       required:
@@ -115,6 +221,33 @@ components:
       - RUNNING
       - DONE
       - FAILED
+    TagResponseDto:
+      type: object
+      required:
+      - id
+      - name
+      - value
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        name:
+          type: string
+        value:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        color:
+          type:
+          - string
+          - "null"
+        parentId:
+          type:
+          - string
+          - "null"
     UUID:
       type: string
       format: uuid
@@ -308,6 +441,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/AssetRefreshJobStatus"
       summary: Refresh Status
+      tags:
+      - User Resource
+  /api/users/{id}/assets/trashed:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchAssetsResponse"
+      summary: Trashed Assets
       tags:
       - User Resource
   /api/users/{id}/assets/{assetId}/convert:
