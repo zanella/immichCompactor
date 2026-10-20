@@ -56,11 +56,20 @@
               </td>
               <td class="py-2 px-3 text-gray-500 text-xs">{{ asset.updatedAt }}</td>
               <td class="py-2 px-3 text-right whitespace-nowrap">
-                <a
-                  :href="`${user?.immichServerUrl}/photos/${asset.id}`"
-                  target="_blank" rel="noopener noreferrer"
-                  class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 transition-colors whitespace-nowrap"
-                >View</a>
+                <div class="inline-flex items-center gap-2">
+                  <a
+                    :href="`${user?.immichServerUrl}/photos/${asset.id}`"
+                    target="_blank" rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                  >View</a>
+                  <button
+                    :disabled="deletingIds.has(asset.id)"
+                    class="inline-flex items-center gap-1 px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    @click="deleteAsset(asset.id)"
+                  >
+                    {{ deletingIds.has(asset.id) ? '...' : 'Delete' }}
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -71,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, ref} from "vue";
+import {onMounted, reactive, ref} from "vue";
 import {useRoute} from "vue-router";
 import {userResourceApi} from "@/integration/immichServerClient.ts";
 import type {UserInfo} from "@/generated";
@@ -84,6 +93,7 @@ const userId = route.params.id as string;
 const user = ref<UserInfo | null>(null);
 const trashedAssets = ref<any>(null);
 const loading = ref(false);
+const deletingIds = reactive(new Set<string>());
 
 function fetchTrashed() {
   loading.value = true;
@@ -91,6 +101,13 @@ function fetchTrashed() {
     .then(res => res.json())
     .then(data => { trashedAssets.value = data; })
     .finally(() => { loading.value = false; });
+}
+
+function deleteAsset(assetId: string) {
+  deletingIds.add(assetId);
+  fetch(`/api/users/${userId}/assets/${assetId}`, { method: 'DELETE' })
+    .then(() => { fetchTrashed(); })
+    .finally(() => { deletingIds.delete(assetId); });
 }
 
 onMounted(() => {

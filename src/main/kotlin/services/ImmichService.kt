@@ -291,6 +291,7 @@ class ImmichService(
 
     // /////////////////////////////////////////////////////////////////////////
 
+    /* TODO: Only the admin can do this...
     fun ensureTagsFeatureEnabled(
         apiKey: String,
         client: ImmichClient,
@@ -318,7 +319,7 @@ class ImmichService(
         check(putResponse.status in 200..299) {
             "Failed to enable tags feature: ${putResponse.status}"
         }
-    }
+    } */
 
     // /////////////////////////////////////////////////////////////////////////
 }

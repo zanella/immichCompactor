@@ -74,10 +74,12 @@ data class AssetResponseDto(
     val isOffline: Boolean,
     val isTrashed: Boolean,
     val libraryId: UUID? = null,
+    val livePhotoVideoId: UUID? = null,
     val originalFileName: String,
     val originalMimeType: String? = null,
     val originalPath: String? = null,
     val ownerId: UUID,
     val tags: List<TagResponseDto> = emptyList(),
+    val type: String? = null,
     val width: Int? = null,
 )

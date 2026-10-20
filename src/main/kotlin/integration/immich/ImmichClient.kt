@@ -87,6 +87,15 @@ interface ImmichClient {
         requestBody: DeleteAssetsRequest,
     )
 
+    @PUT
+    @Path("/assets/{id}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    fun updateAsset(
+        @HeaderParam(X_API_KEY) apiKey: String,
+        @PathParam("id") assetId: UUID,
+        requestBody: UpdateAssetDto,
+    ): AssetResponseDto
+
     @GET
     @Path("/assets/statistics")
     fun getAssetStatistics(
@@ -129,19 +138,19 @@ interface ImmichClient {
         @HeaderParam(X_API_KEY) apiKey: String,
     ): ServerAboutDto
 
-    @GET
+    /* @GET
     @Path("/system-config")
     fun getSystemConfig(
         @HeaderParam(X_API_KEY) apiKey: String,
-    ): Response
+    ): Response */
 
-    @PUT
+    /* @PUT
     @Path("/system-config")
     @Consumes(MediaType.APPLICATION_JSON)
     fun updateSystemConfig(
         @HeaderParam(X_API_KEY) apiKey: String,
         body: String,
-    ): Response
+    ): Response */
 
     companion object {
         const val X_API_KEY = "x-api-key"

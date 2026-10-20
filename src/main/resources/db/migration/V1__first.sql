@@ -13,11 +13,12 @@ CREATE TABLE user_info (
 --
 
 CREATE TABLE assets_staging_area (
-    user_id         integer not null,
-    asset_id        varchar(255) not null primary key,
-    content_type    varchar(255) not null,
-    current_state   varchar(255) not null,
-    replacement_id  varchar(255),
+    user_id                     integer not null,
+    asset_id                    varchar(255) not null primary key,
+    content_type                varchar(255) not null,
+    current_state               varchar(255) not null,
+    replacement_id              varchar(255),
+    replace_live_photo_video_id_of    varchar(255),
 
     foreign key (user_id) references user_info(id) on delete cascade
 );

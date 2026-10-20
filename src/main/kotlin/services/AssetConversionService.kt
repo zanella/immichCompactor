@@ -17,6 +17,7 @@ import integration.immich.AssetMediaStatus
 import integration.immich.BulkTagAssetsDto
 import integration.immich.DeleteAssetsRequest
 import integration.immich.ImmichClient
+import integration.immich.UpdateAssetDto
 import internal.lang.CustomEither
 import internal.lang.runCatchingSafely
 import io.quarkus.logging.Log
@@ -28,6 +29,7 @@ import jakarta.enterprise.event.Observes
 import jakarta.transaction.Transactional
 import jakarta.ws.rs.core.MediaType
 import services.HandledContentType.UNKNOWN
+import services.ImmichService.Companion.instantiateClient
 import java.io.File
 import java.nio.file.Files
 import java.util.UUID
@@ -142,6 +144,15 @@ class AssetConversionService(
 
             Log.debug("assetInfo: $assetInfoResult")
 
+            /*
+              TODO: If the asset is an img and has a livePhotoVideoId
+               - Convert the linked video
+               - Update the livePhotoVideoId of the original asset, then proceed
+
+               http://192.168.1.102:2283/photos/59d7e42c-2a00-4301-957b-105dd8f5b420
+               http://192.168.1.102:2283/photos/f8fb63d1-e62e-42dc-9cbe-3c30b5c67c4b
+             */
+
             val errorMsgForSituationThatDropsTheAssetFromQueue =
                 if (assetInfoResult == null) {
                     "The asset was not found in Immich"
@@ -163,6 +174,28 @@ class AssetConversionService(
                 }
 
             val assetInfo = requireNotNull(assetInfoResult)
+
+            if (assetInfo.livePhotoVideoId != null) {
+                QuarkusTransaction
+                    .requiringNew()
+                    .run {
+                        assetStagingAreaRepository
+                            .getById(assetInfo.livePhotoVideoId)
+                            .also { it.replaceLivePhotoVideoIdOf = assetInfo.id }
+                    }
+
+                val res =
+                    processQueuedAsset(
+                        ctx.userInfo.id,
+                        assetInfo.livePhotoVideoId,
+                        setOf(ContentType.VIDEO),
+                    )
+
+                when (res) {
+                    is CustomEither.Left -> { /* pass */ }
+                    is CustomEither.Right -> return res
+                }
+            }
 
             val (_, suffix) =
                 splitFileName(assetInfo.originalFileName)
@@ -246,9 +279,29 @@ class AssetConversionService(
                     if (it.count != 1) {
                         return CustomEither.Right("Immich didn't tag the new asset ${stagedAsset.replacementId}")
                     }
-
-                    modifyAsset(stagedAsset, WAITING_DELETION)
                 }
+
+            if (stagedAsset.replaceLivePhotoVideoIdOf != null) {
+                val response =
+                    ctx.client.updateAsset(
+                        ctx.userInfo.apiKey,
+                        requireNotNull(stagedAsset.replaceLivePhotoVideoIdOf),
+                        UpdateAssetDto(
+                            livePhotoVideoId = stagedAsset.replacementId,
+                        ),
+                    )
+
+                if (response.livePhotoVideoId != stagedAsset.assetId) {
+                    return CustomEither
+                        .Right(
+                            """Immich didn't update the asset ${stagedAsset.replaceLivePhotoVideoIdOf} 
+                            livePhotoVideoId to ${stagedAsset.assetId}
+                            """.trimMargin(),
+                        )
+                }
+            }
+
+            modifyAsset(stagedAsset, WAITING_DELETION)
 
             return null
         }

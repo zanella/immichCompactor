@@ -35,6 +35,9 @@ data class StagedAsset(
     @Column("replacement_id")
     @JdbcTypeCode(SqlTypes.VARCHAR)
     var replacementId: AssetId? = null,
+    @Column("replace_live_photo_video_id_of")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    var replaceLivePhotoVideoIdOf: AssetId? = null,
 ) : PanacheEntityBase
 
 enum class AssetConversionState {

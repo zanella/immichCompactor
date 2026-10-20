@@ -12,10 +12,11 @@ class Main {
      *
      * TODO:
      *  - Ensure only one conversion request is handled at a time: mutex
+     *  - The asset list has to be ordered, not custom -> IMAGE, VIDEO, UNKNOWN
      *  - handle assets with UNKNOWN type
-     *  - There's smth special about the videos from an iPhone: when one gets replaced, Immich doesn't show them
-     *      on the trash page, but, if you go directly to one of them you get the option to delete permanently,
-     *      meaning: they are marked as deleted, no idea why they don't show up on the trash then...
+     *  - livePhotoVideoId is handled correctly now -> write a test asserting it
+     *  - The postgres started on the tests has lots of processes, can it be trimmed ?
+     *  - Fix the tag feature checking
      */
     fun run(vararg args: String?): Int = 0
 }

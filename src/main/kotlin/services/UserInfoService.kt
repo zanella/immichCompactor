@@ -42,7 +42,7 @@ class UserInfoService(
 
             val client = ImmichClient.instantiateClient(immichServerUrl)
 
-            immichService.ensureTagsFeatureEnabled(apiKey, client)
+            // TODO: immichService.ensureTagsFeatureEnabled(apiKey, client)
 
             val tagId = immichService.upsertTag(apiKey, client).id
 

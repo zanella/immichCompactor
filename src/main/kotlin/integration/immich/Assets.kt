@@ -47,6 +47,11 @@ data class DeleteAssetsRequest(
 )
 
 @Serializable
+data class UpdateAssetDto(
+    val livePhotoVideoId: UUID? = null,
+)
+
+@Serializable
 data class BulkIdResponseDto(
     val id: UUID,
     val success: Boolean,

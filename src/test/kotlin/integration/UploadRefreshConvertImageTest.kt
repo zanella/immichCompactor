@@ -122,8 +122,7 @@ class UploadRefreshConvertImageTest {
             "Expected conversion to succeed, got: $result",
         )
 
-        replacementAssetId = (result as internal.lang.CustomEither.Left).value.second
-        assertNotNull(replacementAssetId, "Expected a replacement asset id")
+        assertNotNull(result.value.second, "Expected a replacement asset id")
     }
 
     @Test

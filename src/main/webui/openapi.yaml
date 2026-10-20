@@ -86,6 +86,10 @@ components:
           anyOf:
           - $ref: "#/components/schemas/UUID"
           - type: "null"
+        livePhotoVideoId:
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
         originalFileName:
           type: string
         originalMimeType:
@@ -102,6 +106,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TagResponseDto"
+        type:
+          type:
+          - string
+          - "null"
         width:
           type:
           - integer
