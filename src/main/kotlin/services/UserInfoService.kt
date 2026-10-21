@@ -53,7 +53,7 @@ class UserInfoService(
                         UserInfo(
                             apiKey = apiKey,
                             name = name,
-                            immichServerUrl = immichServerUrl,
+                            immichServerUrl = immichServerUrl.trimEnd('/'),
                             _tagUUID = tagId.toString(),
                         )
 
