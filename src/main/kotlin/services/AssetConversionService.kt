@@ -25,6 +25,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.runtime.StartupEvent
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.enterprise.context.control.ActivateRequestContext
 import jakarta.enterprise.event.Observes
 import jakarta.transaction.Transactional
 import jakarta.ws.rs.core.MediaType
@@ -72,11 +73,12 @@ class AssetConversionService(
         Thread.ofVirtual().start {
             stuckAssets.forEach { (userId, assetId) ->
                 runCatchingSafely { processQueuedAsset(userId, assetId) }
-                    .onFailure { e -> Log.error("Failed to resume asset $assetId: ${e.message}") }
+                    .onFailure { e -> Log.error("Failed to resume asset $assetId: ${e.message}", e) }
             }
         }
     }
 
+    @ActivateRequestContext // Spawns a temporary CDI Request Context for this background thread
     fun processQueuedAsset(
         userId: UserId,
         queuedAssetId: UUID,
@@ -143,15 +145,6 @@ class AssetConversionService(
             val assetInfoResult = immichService.getAssetInfo(userInfo.apiKey, stagedAsset.assetId, client)
 
             Log.debug("assetInfo: $assetInfoResult")
-
-            /*
-              TODO: If the asset is an img and has a livePhotoVideoId
-               - Convert the linked video
-               - Update the livePhotoVideoId of the original asset, then proceed
-
-               http://192.168.1.102:2283/photos/59d7e42c-2a00-4301-957b-105dd8f5b420
-               http://192.168.1.102:2283/photos/f8fb63d1-e62e-42dc-9cbe-3c30b5c67c4b
-             */
 
             val errorMsgForSituationThatDropsTheAssetFromQueue =
                 if (assetInfoResult == null) {
