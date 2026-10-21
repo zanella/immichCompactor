@@ -84,7 +84,7 @@ class ImmichService(
         return response.readEntity(AssetResponseDto::class.java)
     }
 
-    fun findAllAssets(
+    fun findAllUntaggedAssets(
         client: ImmichClient,
         userInfo: UserInfo,
         cursor: String? = null,
@@ -106,7 +106,7 @@ class ImmichService(
 
     fun findTrashedAssets(
         client: ImmichClient,
-        userInfo: UserInfo,
+        apiKey: String,
         cursor: String? = null,
     ): SearchAssetsResponse {
         val searchCriteria =
@@ -121,7 +121,7 @@ class ImmichService(
                 cursor = cursor,
             )
 
-        return client.searchByMetadata(userInfo.apiKey, searchCriteria)
+        return client.searchByMetadata(apiKey, searchCriteria)
     }
 
     data class FindAndEnqueueAllAssetsResponse(
@@ -140,6 +140,8 @@ class ImmichService(
     ): FindAndEnqueueAllAssetsResponse {
         /*
          * TODO: https://api.immich.app/endpoints/jobs/getQueuesLegacy
+         *
+         * It is possible, use the new queues endpoint
          *
          * The endpoint above is deprecated, so... can't be sure there are no jobs running :-/
          */
@@ -162,7 +164,7 @@ class ImmichService(
         var nextCursor: String? = null
 
         do {
-            val searchAssetsResponse = findAllAssets(client, userInfo, nextCursor).assets
+            val searchAssetsResponse = findAllUntaggedAssets(client, userInfo, nextCursor).assets
 
             val assetsToBeStaged =
                 searchAssetsResponse.items

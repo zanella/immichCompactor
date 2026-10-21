@@ -1,140 +1,80 @@
 package integration
 
 import database.AssetConversionState
-import database.AssetStagingAreaRepository
-import database.UserInfoRepository
 import integration.immich.AssetMediaStatus
 import integration.immich.AssetResponseDto
-import integration.immich.ImmichClient
 import internal.lang.CustomEither
-import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
-import jakarta.inject.Inject
-import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
-import org.junit.jupiter.api.MethodOrderer
-import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.TestMethodOrder
-import services.AssetConversionService
 import services.ContentType
-import services.ImmichService
 import java.io.File
-import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @QuarkusTest
-@TestMethodOrder(MethodOrderer.OrderAnnotation::class)
-class UploadRefreshConvertNonCompressibleVideoTest {
-    @Inject
-    lateinit var immichService: ImmichService
-
-    @Inject
-    lateinit var userInfoRepository: UserInfoRepository
-
-    @Inject
-    lateinit var assetStagingAreaRepository: AssetStagingAreaRepository
-
-    @Inject
-    lateinit var assetConversionService: AssetConversionService
-
-    private val immichBaseUrl = ImmichTestEnvironment.baseUrl
-    private val immichApiKey = ImmichTestEnvironment.apiKey
-    private val client: ImmichClient by lazy { immichService.instantiateClient(immichBaseUrl) }
-
-    companion object {
-        private var uploadedAssetId: UUID? = null
+class UploadRefreshConvertNonCompressibleVideoTest : ImmichTestEnvironment() {
+    private val firstNonCompressibleVideoFile: File by lazy {
+        getTestAsset("src/test/resources/assets/first_non_compressable_video.mp4")
     }
 
     @Test
-    @Order(1)
     fun `upload non-compressible video to Immich`() {
-        val videoFile =
-            File("src/test/resources/assets/first_non_compressable_video.mp4")
-                .also { require(it.exists()) { "Test asset not found: ${it.absolutePath}" } }
-
-        val multipartForm =
-            ClientMultipartForm
-                .create()
-                .binaryFileUpload("assetData", videoFile.name, videoFile.absolutePath, "video/mp4")
-                .attribute("deviceAssetId", "${videoFile.name}-test", "")
-                .attribute("deviceId", "immich-compactor-test", "")
-                .attribute("fileCreatedAt", "2025-01-01T00:00:00.000Z", "")
-                .attribute("fileModifiedAt", "2025-01-01T00:00:00.000Z", "")
-
-        val response = client.uploadAsset(immichApiKey, multipartForm)
+        val response = uploadVideoToImmich(firstNonCompressibleVideoFile)
 
         assertEquals(AssetMediaStatus.CREATED, response.status, "Upload did not create asset")
-        uploadedAssetId = response.id
-        assertNotNull(uploadedAssetId, "Uploaded asset id should not be null")
     }
 
     @Test
-    @Order(2)
     fun `refresh assets`() {
-        QuarkusTransaction.requiringNew().run { assetStagingAreaRepository.deleteAll() }
+        uploadVideoToImmich(firstNonCompressibleVideoFile)
 
-        val userInfo =
-            QuarkusTransaction
-                .requiringNew()
-                .call { userInfoRepository.listAll().single() }
-
-        val result = immichService.findAndEnqueueAllAssets(client, userInfo)
-
-        assertTrue(result.assetsFound > 0, "Expected at least 1 asset found, got: $result")
-        assertTrue(result.assetsQueued > 0, "Expected at least 1 asset queued, got: $result")
+        immichService.findAndEnqueueAllAssets(client, getUserInfo()).also {
+            assertTrue(it.assetsFound > 0, "Expected at least 1 asset found, got: $it")
+            assertTrue(it.assetsQueued > 0, "Expected at least 1 asset queued, got: $it")
+        }
     }
 
     @Test
-    @Order(3)
     fun `assert one VIDEO entry in DB after refresh`() {
-        val stagedAssets =
-            assetStagingAreaRepository
-                .listAll()
-                .filter { it.assetId == uploadedAssetId }
+        uploadVideoToImmich(firstNonCompressibleVideoFile)
 
-        assertEquals(1, stagedAssets.size, "Expected exactly 1 staged asset for uploaded video, got: ${stagedAssets.size}")
-        assertEquals(ContentType.VIDEO, stagedAssets.single().contentType, "Expected VIDEO content type")
-        assertEquals(AssetConversionState.QUEUED, stagedAssets.single().currentState, "Expected QUEUED state")
+        immichService.findAndEnqueueAllAssets(client, getUserInfo())
+
+        assetStagingAreaRepository.listAll().also {
+            assertEquals(1, it.size, "Expected exactly 1 staged asset for uploaded video, got: ${it.size}")
+            assertEquals(ContentType.VIDEO, it.single().contentType, "Expected VIDEO content type")
+            assertEquals(AssetConversionState.QUEUED, it.single().currentState, "Expected QUEUED state")
+        }
     }
 
     @Test
-    @Order(4)
     fun `convert the video and assert not improvable`() {
-        val assetId = checkNotNull(uploadedAssetId) { "No uploaded asset id" }
-        val userInfo = userInfoRepository.listAll().single()
+        val assetId = uploadVideoToImmich(firstNonCompressibleVideoFile).id
 
-        val result = assetConversionService.processQueuedAsset(userInfo.id, assetId)
+        val userInfo = getUserInfo()
 
-        assertTrue(
-            result is CustomEither.Right,
-            "Expected conversion to be skipped (not improvable), got: $result",
-        )
-        assertTrue(
-            result.value.contains("smaller"),
-            "Expected 'smaller' reason, got: ${result.value}",
-        )
+        immichService.findAndEnqueueAllAssets(client, userInfo)
 
-        val stagedAsset =
-            assetStagingAreaRepository
-                .listAll()
-                .single { it.assetId == assetId }
+        assetConversionService.processQueuedAsset(userInfo.id, assetId).also {
+            assertTrue(
+                it is CustomEither.Right,
+                "Expected conversion to be skipped (not improvable), got: $it",
+            )
 
-        assertEquals(
-            AssetConversionState.KEEP_AS_IS,
-            stagedAsset.currentState,
-            "Expected KEEP_AS_IS state for non-improvable asset",
-        )
-    }
+            assertTrue(it.value.contains("smaller"), "Expected 'smaller' reason, got: ${it.value}")
+        }
 
-    @Test
-    @Order(5)
-    fun `original asset is not trashed`() {
-        val originalId = checkNotNull(uploadedAssetId)
+        assetStagingAreaRepository.listAll().single { it.assetId == assetId }.also {
+            assertEquals(
+                AssetConversionState.KEEP_AS_IS,
+                it.currentState,
+                "Expected KEEP_AS_IS state for non-improvable asset",
+            )
+        }
 
-        val originalResponse = client.getAssetInfo(immichApiKey, originalId)
+        // Assert: original asset is not trashed
+        val originalResponse = client.getAssetInfo(apiKey, assetId)
         assertEquals(200, originalResponse.status, "Could not fetch original asset")
 
         val originalAsset = originalResponse.readEntity(AssetResponseDto::class.java)
@@ -142,25 +82,27 @@ class UploadRefreshConvertNonCompressibleVideoTest {
     }
 
     @Test
-    @Order(6)
     fun `KEEP_AS_IS asset is not re-enqueued on second refresh`() {
-        val assetId = checkNotNull(uploadedAssetId)
-        val userInfo = userInfoRepository.listAll().single()
+        val assetId = uploadVideoToImmich(firstNonCompressibleVideoFile).id
 
-        val result = immichService.findAndEnqueueAllAssets(client, userInfo)
+        val userInfo = getUserInfo()
 
-        assertEquals(0L, result.assetsQueued, "KEEP_AS_IS asset should not be re-enqueued, got: $result")
+        immichService.findAndEnqueueAllAssets(client, userInfo)
 
-        val stagedAssets =
-            assetStagingAreaRepository
-                .listAll()
-                .filter { it.assetId == assetId }
+        assetConversionService.processQueuedAsset(userInfo.id, assetId)
 
-        assertEquals(1, stagedAssets.size, "Expected exactly 1 staged asset, got: ${stagedAssets.size}")
-        assertEquals(
-            AssetConversionState.KEEP_AS_IS,
-            stagedAssets.single().currentState,
-            "Asset should still be in KEEP_AS_IS state",
-        )
+        // 2nd run
+        immichService
+            .findAndEnqueueAllAssets(client, userInfo)
+            .also { assertEquals(0L, it.assetsQueued, "KEEP_AS_IS asset should not be re-enqueued, got: $it") }
+
+        assetStagingAreaRepository.listAll().filter { it.assetId == assetId }.also {
+            assertEquals(1, it.size, "Expected exactly 1 staged asset, got: ${it.size}")
+            assertEquals(
+                AssetConversionState.KEEP_AS_IS,
+                it.single().currentState,
+                "Asset should still be in KEEP_AS_IS state",
+            )
+        }
     }
 }

@@ -1,162 +1,110 @@
 package integration
 
-import database.AssetStagingAreaRepository
-import database.UserInfoRepository
+import database.AssetConversionState
 import integration.immich.AssetMediaStatus
 import integration.immich.AssetResponseDto
 import integration.immich.IMMICH_COMPACTOR_TAG_NAME
-import integration.immich.ImmichClient
-import io.quarkus.narayana.jta.QuarkusTransaction
+import internal.lang.CustomEither
 import io.quarkus.test.junit.QuarkusTest
-import jakarta.inject.Inject
-import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
-import org.junit.jupiter.api.MethodOrderer
-import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.TestMethodOrder
-import services.AssetConversionService
-import services.ImmichService
+import services.ContentType
 import java.io.File
-import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @QuarkusTest
-@TestMethodOrder(MethodOrderer.OrderAnnotation::class)
-class UploadRefreshConvertVideoTest {
-    @Inject
-    lateinit var immichService: ImmichService
-
-    @Inject
-    lateinit var userInfoRepository: UserInfoRepository
-
-    @Inject
-    lateinit var assetStagingAreaRepository: AssetStagingAreaRepository
-
-    @Inject
-    lateinit var assetConversionService: AssetConversionService
-
-    private val immichBaseUrl = ImmichTestEnvironment.baseUrl
-    private val immichApiKey = ImmichTestEnvironment.apiKey
-    private val client: ImmichClient by lazy { immichService.instantiateClient(immichBaseUrl) }
-
-    companion object {
-        private var uploadedAssetId: UUID? = null
-        private var replacementAssetId: UUID? = null
-        private var originalAssetInfo: AssetResponseDto? = null
+class UploadRefreshConvertVideoTest : ImmichTestEnvironment() {
+    private val firstVideoFile: File by lazy {
+        getTestAsset("src/test/resources/assets/first_compressable_video.mp4")
     }
 
     @Test
-    @Order(1)
     fun `upload video to Immich`() {
-        val videoFile =
-            File("src/test/resources/assets/first_compressable_video.mp4")
-                .also { require(it.exists()) { "Test asset not found: ${it.absolutePath}" } }
-
-        val multipartForm =
-            ClientMultipartForm
-                .create()
-                .binaryFileUpload("assetData", videoFile.name, videoFile.absolutePath, "video/mp4")
-                .attribute("deviceAssetId", "${videoFile.name}-test", "")
-                .attribute("deviceId", "immich-compactor-test", "")
-                .attribute("fileCreatedAt", "2025-01-01T00:00:00.000Z", "")
-                .attribute("fileModifiedAt", "2025-01-01T00:00:00.000Z", "")
-
-        val response = client.uploadAsset(immichApiKey, multipartForm)
-
-        assertEquals(AssetMediaStatus.CREATED, response.status, "Upload did not create asset")
-        uploadedAssetId = response.id
-        assertNotNull(uploadedAssetId, "Uploaded asset id should not be null")
-
-        val assetInfoResponse = client.getAssetInfo(immichApiKey, uploadedAssetId!!)
-        originalAssetInfo = assetInfoResponse.readEntity(AssetResponseDto::class.java)
+        assertEquals(
+            AssetMediaStatus.CREATED,
+            uploadVideoToImmich(firstVideoFile).status,
+            "Upload did not create asset",
+        )
     }
 
     @Test
-    @Order(2)
     fun `refresh assets`() {
-        QuarkusTransaction.requiringNew().run { assetStagingAreaRepository.deleteAll() }
+        uploadVideoToImmich(firstVideoFile)
 
-        val userInfo =
-            QuarkusTransaction
-                .requiringNew()
-                .call { userInfoRepository.listAll().single() }
-
-        val result = immichService.findAndEnqueueAllAssets(client, userInfo)
-
-        assertTrue(result.assetsFound > 0, "Expected at least 1 asset found, got: $result")
-        assertTrue(result.assetsQueued > 0, "Expected at least 1 asset queued, got: $result")
+        immichService.findAndEnqueueAllAssets(client, getUserInfo()).also {
+            assertTrue(it.assetsFound > 0, "Expected at least 1 asset found, got: $it")
+            assertTrue(it.assetsQueued > 0, "Expected at least 1 asset queued, got: $it")
+        }
     }
 
     @Test
-    @Order(3)
     fun `assert one VIDEO entry in DB after refresh`() {
-        val stagedAssets =
-            assetStagingAreaRepository
-                .listAll()
-                .filter { it.assetId == uploadedAssetId }
+        uploadVideoToImmich(firstVideoFile)
 
-        assertEquals(1, stagedAssets.size, "Expected exactly 1 staged asset for uploaded video, got: ${stagedAssets.size}")
-        assertEquals(
-            services.ContentType.VIDEO,
-            stagedAssets.first().contentType,
-            "Expected VIDEO content type",
-        )
-        assertEquals(
-            database.AssetConversionState.QUEUED,
-            stagedAssets.first().currentState,
-            "Expected QUEUED state",
-        )
+        immichService.findAndEnqueueAllAssets(client, getUserInfo())
+
+        assetStagingAreaRepository.listAll().also {
+            assertEquals(1, it.size, "Expected exactly 1 staged asset for uploaded video, got: ${it.size}")
+            assertEquals(ContentType.VIDEO, it.single().contentType, "Expected VIDEO content type")
+            assertEquals(AssetConversionState.QUEUED, it.single().currentState, "Expected QUEUED state")
+        }
     }
 
     @Test
-    @Order(4)
     fun `convert the video`() {
-        val assetId = checkNotNull(uploadedAssetId) { "No uploaded asset id" }
-        val userInfo = userInfoRepository.listAll().single()
+        val assetId = uploadVideoToImmich(firstVideoFile).id
 
-        val result = assetConversionService.processQueuedAsset(userInfo.id, assetId)
+        val userInfo = getUserInfo()
 
-        assertTrue(
-            result is internal.lang.CustomEither.Left,
-            "Expected video conversion to succeed, got: $result",
-        )
+        immichService.findAndEnqueueAllAssets(client, userInfo)
 
-        replacementAssetId = result.value.second
-        assertNotNull(replacementAssetId, "Expected a replacement asset id")
+        assetConversionService.processQueuedAsset(userInfo.id, assetId).also {
+            assertTrue(it is CustomEither.Left, "Expected video conversion to succeed, got: $it")
+            assertNotNull(it.value.second, "Expected a replacement asset id")
+        }
     }
 
     @Test
-    @Order(5)
     fun `original asset is trashed and replacement is in timeline`() {
-        val originalId = checkNotNull(uploadedAssetId)
-        val newId = checkNotNull(replacementAssetId)
-        val original = checkNotNull(originalAssetInfo)
+        val originalId = uploadVideoToImmich(firstVideoFile).id
 
-        val originalResponse = client.getAssetInfo(immichApiKey, originalId)
+        val userInfo = getUserInfo()
+
+        immichService.findAndEnqueueAllAssets(client, userInfo)
+
+        val newId =
+            assetConversionService
+                .processQueuedAsset(userInfo.id, assetStagingAreaRepository.listAll().single().assetId)
+                .let {
+                    assertTrue { it is CustomEither.Left }
+
+                    (it as CustomEither.Left).value.second
+                }
+
+        val originalResponse = client.getAssetInfo(apiKey, originalId)
         assertEquals(200, originalResponse.status, "Could not fetch original asset")
         val originalAsset = originalResponse.readEntity(AssetResponseDto::class.java)
         assertTrue(originalAsset.isTrashed, "Original asset should be trashed")
 
-        val newResponse = client.getAssetInfo(immichApiKey, newId)
+        val newResponse = client.getAssetInfo(apiKey, newId)
         assertEquals(200, newResponse.status, "Could not fetch replacement asset")
         val newAsset = newResponse.readEntity(AssetResponseDto::class.java)
         assertFalse(newAsset.isTrashed, "Replacement asset should not be trashed")
 
         assertEquals(
-            original.fileModifiedAt,
+            originalAsset.fileModifiedAt,
             newAsset.fileModifiedAt,
             "Replacement should have same fileModifiedAt as original",
         )
         assertEquals(
-            original.isFavorite,
+            originalAsset.isFavorite,
             newAsset.isFavorite,
             "Replacement should have same isFavorite as original",
         )
         assertEquals(
-            original.isArchived,
+            originalAsset.isArchived,
             newAsset.isArchived,
             "Replacement should have same isArchived as original",
         )

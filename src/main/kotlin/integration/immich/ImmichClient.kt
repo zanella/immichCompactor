@@ -105,6 +105,14 @@ interface ImmichClient {
     // /////////////////////////////////////////////////////////////////////////
 
     @GET
+    @Path("/queues")
+    fun getQueues(
+        @HeaderParam(X_API_KEY) apiKey: String,
+    ): List<QueueResponseDto>
+
+    // /////////////////////////////////////////////////////////////////////////
+
+    @GET
     @Path("/tags")
     fun getTags(
         @HeaderParam(X_API_KEY) apiKey: String,
@@ -151,6 +159,14 @@ interface ImmichClient {
         @HeaderParam(X_API_KEY) apiKey: String,
         body: String,
     ): Response */
+
+    // ////////////////////////////////////////////////////////////////////////
+
+    @POST
+    @Path("/trash/empty")
+    fun emptyTrash(
+        @HeaderParam(X_API_KEY) apiKey: String,
+    ): EmptyTrashResponseDto
 
     companion object {
         const val X_API_KEY = "x-api-key"

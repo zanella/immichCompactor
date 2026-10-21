@@ -15,6 +15,7 @@ data class SearchAssetsRequest(
     companion object {
         @Serializable
         data class SearchFilter(
+            val createdAt: DateFilterNullable? = null,
             val tagIds: IdsFilter? = null,
             val trashedAt: DateFilterNullable? = null,
         ) {

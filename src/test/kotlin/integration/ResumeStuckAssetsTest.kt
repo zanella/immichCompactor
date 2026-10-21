@@ -1,236 +1,105 @@
 package integration
 
 import database.AssetConversionState
-import database.AssetStagingAreaRepository
-import database.StagedAsset
-import database.UserInfoRepository
-import integration.immich.AssetResponseDto
-import integration.immich.BulkTagAssetsDto
-import integration.immich.ImmichClient
+import internal.lang.CustomEither
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
-import jakarta.inject.Inject
-import org.jboss.resteasy.reactive.client.api.ClientMultipartForm
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestMethodOrder
-import services.AssetConversionService
-import services.ContentType
-import services.ImmichService
-import java.io.File
-import java.util.UUID
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @QuarkusTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
-class ResumeStuckAssetsTest {
-    @Inject
-    lateinit var immichService: ImmichService
-
-    @Inject
-    lateinit var userInfoRepository: UserInfoRepository
-
-    @Inject
-    lateinit var assetStagingAreaRepository: AssetStagingAreaRepository
-
-    @Inject
-    lateinit var assetConversionService: AssetConversionService
-
-    private val immichBaseUrl = ImmichTestEnvironment.baseUrl
-    private val immichApiKey = ImmichTestEnvironment.apiKey
-    private val client: ImmichClient by lazy { immichService.instantiateClient(immichBaseUrl) }
+class ResumeStuckAssetsTest : ImmichTestEnvironment(doCleanUp = false) {
+    @BeforeEach
+    fun setUp() {
+        assetConversionService.underTest.quitAfterStep = true
+    }
 
     @Test
     @Order(1)
-    fun `asset in REPLACEMENT_HAS_BEEN_UPLOADED resumes to terminal state`() {
-        val (originalId, replacementId) = uploadOriginalAndReplacement()
-        val userInfo = userInfoRepository.listAll().single()
+    fun videoIsUploadedAndReplacementAsWell() {
+        val firstVideoFile = getTestAsset("src/test/resources/assets/first_compressable_video.mp4")
 
-        QuarkusTransaction.requiringNew().run {
-            assetStagingAreaRepository.deleteAll()
-            assetStagingAreaRepository.persist(
-                StagedAsset(
-                    userId = userInfo.id,
-                    assetId = originalId,
-                    contentType = ContentType.IMAGE,
-                    currentState = AssetConversionState.REPLACEMENT_HAS_BEEN_UPLOADED,
-                    replacementId = replacementId,
-                ),
-            )
+        val originalAssetId = uploadVideoToImmich(firstVideoFile).id
+
+        val userInfo = getUserInfo()
+
+        immichService.findAndEnqueueAllAssets(client, userInfo)
+
+        assetConversionService.processQueuedAsset(userInfo.id, originalAssetId).also {
+            assertTrue(it is CustomEither.Right)
+            assertEquals(it.value, "Under test: Leaving after step QUEUED has been completed")
         }
 
-        val result = assetConversionService.processQueuedAsset(userInfo.id, originalId)
-
-        assertTrue(result is internal.lang.CustomEither.Left, "Expected success, got: $result")
-
-        val stagedAssets =
-            QuarkusTransaction
-                .requiringNew()
-                .call { assetStagingAreaRepository.listAll().filter { it.assetId == originalId } }
-        assertTrue(stagedAssets.isEmpty(), "Asset should be dropped from staging area after completion")
-
-        assertOriginalTrashedAndReplacementTagged(originalId, replacementId)
+        QuarkusTransaction.requiringNew().run {
+            assetStagingAreaRepository.flush()
+            assetStagingAreaRepository.listAll().single().run {
+                assertEquals(assetId, originalAssetId)
+                assertEquals(currentState, AssetConversionState.REPLACEMENT_HAS_BEEN_UPLOADED)
+            }
+        }
     }
 
     @Test
     @Order(2)
-    fun `asset in REPLACEMENT_HAS_BEEN_UPDATED_WITH_METADATA resumes to terminal state`() {
-        val (originalId, replacementId) = uploadOriginalAndReplacement()
-        val userInfo = userInfoRepository.listAll().single()
-
-        immichService.transferMetadata(
-            immichApiKey,
-            client,
-            originalId,
-            replacementId,
-        )
+    fun `asset in REPLACEMENT_HAS_BEEN_UPLOADED resumes to terminal state`() {
+        assetConversionService
+            .processQueuedAsset(getUserInfo().id, assetStagingAreaRepository.listAll().single().assetId)
+            .also {
+                assertTrue(it is CustomEither.Right)
+                assertEquals(it.value, "Under test: Leaving after step REPLACEMENT_HAS_BEEN_UPLOADED has been completed")
+            }
 
         QuarkusTransaction.requiringNew().run {
-            assetStagingAreaRepository.deleteAll()
-            assetStagingAreaRepository.persist(
-                StagedAsset(
-                    userId = userInfo.id,
-                    assetId = originalId,
-                    contentType = ContentType.IMAGE,
-                    currentState = AssetConversionState.REPLACEMENT_HAS_BEEN_UPDATED_WITH_METADATA,
-                    replacementId = replacementId,
-                ),
-            )
+            assetStagingAreaRepository.flush()
+            assetStagingAreaRepository.listAll().single().run {
+                assertEquals(AssetConversionState.REPLACEMENT_HAS_BEEN_UPDATED_WITH_METADATA, currentState)
+            }
         }
-
-        val result = assetConversionService.processQueuedAsset(userInfo.id, originalId)
-
-        assertTrue(result is internal.lang.CustomEither.Left, "Expected success, got: $result")
-
-        val stagedAssets =
-            QuarkusTransaction
-                .requiringNew()
-                .call { assetStagingAreaRepository.listAll().filter { it.assetId == originalId } }
-        assertTrue(stagedAssets.isEmpty(), "Asset should be dropped from staging area after completion")
-
-        assertOriginalTrashedAndReplacementTagged(originalId, replacementId)
     }
 
     @Test
     @Order(3)
-    fun `asset in WAITING_DELETION resumes to terminal state`() {
-        val (originalId, replacementId) = uploadOriginalAndReplacement()
-        val userInfo = userInfoRepository.listAll().single()
-
-        immichService.transferMetadata(immichApiKey, client, originalId, replacementId)
-
-        client.bulkTagAssets(
-            immichApiKey,
-            BulkTagAssetsDto(
-                assetIds = listOf(replacementId),
-                tagIds = listOf(userInfo.tagId),
-            ),
-        )
+    fun `asset in REPLACEMENT_HAS_BEEN_UPDATED_WITH_METADATA resumes to terminal state`() {
+        assetConversionService
+            .processQueuedAsset(getUserInfo().id, assetStagingAreaRepository.listAll().single().assetId)
+            .also {
+                assertTrue(it is CustomEither.Right)
+                assertEquals(it.value, "Under test: Leaving after step REPLACEMENT_HAS_BEEN_UPDATED_WITH_METADATA has been completed")
+            }
 
         QuarkusTransaction.requiringNew().run {
-            assetStagingAreaRepository.deleteAll()
-            assetStagingAreaRepository.persist(
-                StagedAsset(
-                    userId = userInfo.id,
-                    assetId = originalId,
-                    contentType = ContentType.IMAGE,
-                    currentState = AssetConversionState.WAITING_DELETION,
-                    replacementId = replacementId,
-                ),
-            )
+            assetStagingAreaRepository.flush()
+            assetStagingAreaRepository.listAll().single().run {
+                assertEquals(currentState, AssetConversionState.WAITING_DELETION)
+            }
         }
-
-        val result = assetConversionService.processQueuedAsset(userInfo.id, originalId)
-
-        assertTrue(result is internal.lang.CustomEither.Left, "Expected success, got: $result")
-
-        val stagedAssets =
-            QuarkusTransaction
-                .requiringNew()
-                .call { assetStagingAreaRepository.listAll().filter { it.assetId == originalId } }
-        assertTrue(stagedAssets.isEmpty(), "Asset should be dropped from staging area after completion")
-
-        assertOriginalTrashedAndReplacementTagged(originalId, replacementId)
     }
 
-    private fun uploadOriginalAndReplacement(): Pair<UUID, UUID> {
-        val screenshotFile =
-            File("src/test/resources/assets/first_screenshot.png")
-                .also { require(it.exists()) { "Test asset not found: ${it.absolutePath}" } }
+    @Test
+    @Order(4)
+    fun `asset in WAITING_DELETION resumes to terminal state`() {
+        assetConversionService
+            .processQueuedAsset(getUserInfo().id, assetStagingAreaRepository.listAll().single().assetId)
+            .also {
+                assertTrue(it is CustomEither.Right)
+                assertEquals(it.value, "Under test: Leaving after step WAITING_DELETION has been completed")
+            }
 
-        val uniqueBytes = UUID.randomUUID().toString().toByteArray()
-
-        val originalFile =
-            File
-                .createTempFile("original-", ".png")
-                .also {
-                    it.writeBytes(screenshotFile.readBytes())
-                    it.appendBytes(uniqueBytes)
-                    it.deleteOnExit()
-                }
-
-        val originalForm =
-            ClientMultipartForm
-                .create()
-                .binaryFileUpload("assetData", originalFile.name, originalFile.absolutePath, "image/png")
-                .attribute("deviceAssetId", "original-${System.nanoTime()}", "")
-                .attribute("deviceId", "resume-test", "")
-                .attribute("fileCreatedAt", "2025-01-01T00:00:00.000Z", "")
-                .attribute("fileModifiedAt", "2025-01-01T00:00:00.000Z", "")
-
-        val originalResponse = client.uploadAsset(immichApiKey, originalForm)
-        val originalId = originalResponse.id
-
-        val originalInfo = client.getAssetInfo(immichApiKey, originalId).readEntity(AssetResponseDto::class.java)
-
-        val replacementFile =
-            File
-                .createTempFile("replacement-", ".png")
-                .also {
-                    it.writeBytes(screenshotFile.readBytes())
-                    it.appendBytes(uniqueBytes)
-                    it.appendBytes(byteArrayOf(0x00))
-                    it.deleteOnExit()
-                }
-
-        val replacementForm =
-            ClientMultipartForm
-                .create()
-                .binaryFileUpload("assetData", replacementFile.name, replacementFile.absolutePath, "image/png")
-                .attribute("deviceAssetId", "replacement-${System.nanoTime()}", "")
-                .attribute("deviceId", "resume-test", "")
-                .attribute("fileCreatedAt", originalInfo.fileCreatedAt, "")
-                .attribute("fileModifiedAt", originalInfo.fileModifiedAt, "")
-
-        val replacementResponse = client.uploadAsset(immichApiKey, replacementForm)
-        val replacementId = replacementResponse.id
-
-        assertNotNull(originalId)
-        assertNotNull(replacementId)
-
-        return originalId to replacementId
+        QuarkusTransaction.requiringNew().run {
+            assetStagingAreaRepository.flush()
+            assertTrue { assetStagingAreaRepository.listAll().isEmpty() }
+        }
     }
 
-    private fun assertOriginalTrashedAndReplacementTagged(
-        originalId: UUID,
-        replacementId: UUID,
-    ) {
-        val originalResponse = client.getAssetInfo(immichApiKey, originalId)
-        assertEquals(200, originalResponse.status, "Could not fetch original asset")
-        val originalAsset = originalResponse.readEntity(AssetResponseDto::class.java)
-        assertTrue(originalAsset.isTrashed, "Original asset should be trashed")
-
-        val newResponse = client.getAssetInfo(immichApiKey, replacementId)
-        assertEquals(200, newResponse.status, "Could not fetch replacement asset")
-        val newAsset = newResponse.readEntity(AssetResponseDto::class.java)
-
-        val tagNames = newAsset.tags.map { it.name }
-        assertTrue(
-            tagNames.contains(integration.immich.IMMICH_COMPACTOR_TAG_NAME),
-            "Replacement should be tagged, got tags: $tagNames",
-        )
+    @Test
+    @Order(5)
+    fun tearDown() {
+        doCleanUp = true
     }
 }

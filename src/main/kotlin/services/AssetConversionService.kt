@@ -44,6 +44,8 @@ class AssetConversionService(
 ) {
     private lateinit var temporaryWorkingDirectory: File
 
+    val underTest: UnderTest = UnderTest()
+
     @PostConstruct
     fun postConstructImpl() {
         temporaryWorkingDirectory =
@@ -120,6 +122,11 @@ class AssetConversionService(
                             WAITING_DELETION -> handleWaitingDeletion(ctx, stagedAsset)
                             KEEP_AS_IS -> CustomEither.Right("This asset shouldn't be selectable in the UI...")
                         }
+
+                    if (underTest.quitAfterStep) {
+                        return CustomEither
+                            .Right("Under test: Leaving after step ${stagedAsset.currentState} has been completed")
+                    }
                 }
 
                 return res
@@ -457,3 +464,7 @@ enum class AssetConversionReason {
     OK,
     ORIGINAL_IS_SMALLER,
 }
+
+data class UnderTest(
+    var quitAfterStep: Boolean = false,
+)
