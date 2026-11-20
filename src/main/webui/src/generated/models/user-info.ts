@@ -23,7 +23,7 @@ export interface UserInfo {
     'immichServerUrl': string;
     '_tagUUID': string;
     '_id'?: number | null;
-    'tagId'?: string;
     'id'?: UserId;
+    'tagId'?: string;
 }
 

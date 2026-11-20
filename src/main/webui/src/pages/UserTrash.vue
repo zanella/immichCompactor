@@ -16,10 +16,10 @@
     </div>
 
     <p v-if="loading && !trashedAssets" class="text-gray-500">Loading...</p>
-    <p v-else-if="trashedAssets && trashedAssets.assets.total === 0" class="text-gray-500">No trashed assets.</p>
+    <p v-else-if="trashedAssets && trashedAssets.total === 0" class="text-gray-500">No trashed assets.</p>
 
-    <div v-if="trashedAssets && trashedAssets.assets.total > 0" class="mt-6">
-      <span class="text-sm text-gray-500">{{ trashedAssets.assets.total }} trashed asset(s)</span>
+    <div v-if="trashedAssets && trashedAssets.total > 0" class="mt-6">
+      <span class="text-sm text-gray-500">{{ trashedAssets.total }} trashed asset(s)</span>
 
       <div class="overflow-x-auto mt-4">
         <table class="w-full text-sm border-collapse whitespace-nowrap">
@@ -35,7 +35,7 @@
           </thead>
           <tbody>
             <tr
-              v-for="(asset, index) in trashedAssets.assets.items"
+              v-for="(asset, index) in trashedAssets.items"
               :key="asset.id"
               class="border-b border-gray-100 hover:bg-gray-50"
             >
@@ -54,7 +54,7 @@
                   {{ asset.originalMimeType ?? 'unknown' }}
                 </span>
               </td>
-              <td class="py-2 px-3 text-gray-500 text-xs">{{ asset.updatedAt }}</td>
+              <td class="py-2 px-3 text-gray-500 text-xs">{{ asset.fileModifiedAt }}</td>
               <td class="py-2 px-3 text-right whitespace-nowrap">
                 <div class="inline-flex items-center gap-2">
                   <a
@@ -83,7 +83,7 @@
 import {onMounted, reactive, ref} from "vue";
 import {useRoute} from "vue-router";
 import {userResourceApi} from "@/integration/immichServerClient.ts";
-import type {UserInfo} from "@/generated";
+import type {SearchAssetResponseDto, UserInfo} from "@/generated";
 
 defineOptions({ name: 'UserTrash' });
 
@@ -91,16 +91,17 @@ const route = useRoute();
 const userId = route.params.id as string;
 
 const user = ref<UserInfo | null>(null);
-const trashedAssets = ref<any>(null);
+const trashedAssets = ref<SearchAssetResponseDto | null>(null);
 const loading = ref(false);
 const deletingIds = reactive(new Set<string>());
 
 function fetchTrashed() {
   loading.value = true;
-  fetch(`/api/users/${userId}/assets/trashed`)
-    .then(res => res.json())
-    .then(data => { trashedAssets.value = data; })
-    .finally(() => { loading.value = false; });
+
+  userResourceApi
+      .apiUsersIdAssetsTrashedGet({ id: userId })
+      .then(res => { trashedAssets.value = res.data.assets; })
+      .finally(() => { loading.value = false; });
 }
 
 function deleteAsset(assetId: string) {
@@ -116,6 +117,7 @@ onMounted(() => {
     .then((res) => {
       user.value = res.data.userInfo;
     });
+
 
   fetchTrashed();
 });

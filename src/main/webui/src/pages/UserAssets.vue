@@ -191,7 +191,12 @@
 import {computed, onMounted, onUnmounted, reactive, ref} from "vue";
 import {useRoute} from "vue-router";
 import {userResourceApi} from "@/integration/immichServerClient.ts";
-import type {ConvertResultResponse, JobStatus, QueuedAssetsResponse, UserInfo} from "@/generated";
+import type {
+  AssetRefreshJobStatus,
+  ConvertResultResponse,
+  QueuedAssetsResponse,
+  UserInfo
+} from "@/generated";
 
 defineOptions({ name: 'UserAssets' });
 
@@ -199,7 +204,7 @@ const route = useRoute();
 const userId = route.params.id as string;
 
 const user = ref<UserInfo | null>(null);
-const refreshStatus = ref<JobStatus | null>(null);
+const refreshStatus = ref<AssetRefreshJobStatus | null>(null);
 const queuedData = ref<QueuedAssetsResponse | null>(null);
 const pageSizeOptions = [10, 25, 50, 100, 1000];
 const pageSize = ref(50);

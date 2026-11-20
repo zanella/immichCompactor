@@ -20,7 +20,7 @@ import type { Instant } from './instant';
 // @ts-ignore
 import type { State } from './state';
 
-export interface JobStatus {
+export interface AssetRefreshJobStatus {
     'threadId': number;
     'state': State;
     'assetsFound'?: number;

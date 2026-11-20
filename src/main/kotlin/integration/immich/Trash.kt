@@ -6,3 +6,8 @@ import kotlinx.serialization.Serializable
 data class EmptyTrashResponseDto(
     val count: Int,
 )
+
+@Serializable
+data class RestoreTrashResponseDto(
+    val count: Int,
+)

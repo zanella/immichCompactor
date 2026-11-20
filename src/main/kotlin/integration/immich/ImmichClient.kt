@@ -150,9 +150,9 @@ interface ImmichClient {
     @Path("/system-config")
     fun getSystemConfig(
         @HeaderParam(X_API_KEY) apiKey: String,
-    ): Response */
+    ): Response
 
-    /* @PUT
+    @PUT
     @Path("/system-config")
     @Consumes(MediaType.APPLICATION_JSON)
     fun updateSystemConfig(

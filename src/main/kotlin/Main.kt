@@ -14,8 +14,7 @@ class Main {
      *  - Ensure only one conversion request is handled at a time: mutex
      *  - The asset list has to be ordered, not custom -> IMAGE, VIDEO, UNKNOWN
      *  - handle assets with UNKNOWN type
-     *  - livePhotoVideoId is handled correctly now -> write a test asserting it
-     *  - The postgres started on the tests has lots of processes, can it be trimmed ?
+     *  - livePhotoVideoId is handled correctly now -> write a test asserting it <-----
      *  - Fix the tag feature checking
      */
     fun run(vararg args: String?): Int = 0

@@ -4,6 +4,7 @@ package api
 
 import database.UserId
 import database.UserInfo
+import integration.immich.SearchAssetsResponse
 import internal.lang.CustomEither
 import internal.serdes.UUIDSerializer
 import jakarta.ws.rs.DefaultValue
@@ -83,7 +84,7 @@ class UserResource(
     @Produces(APPLICATION_JSON)
     fun trashedAssets(
         @PathParam("id") rawUserId: String,
-    ): integration.immich.SearchAssetsResponse {
+    ): SearchAssetsResponse {
         val userInfo =
             UserId
                 .from(rawUserId)
@@ -92,7 +93,7 @@ class UserResource(
 
         val client = immichService.instantiateClient(userInfo.immichServerUrl)
 
-        return immichService.findTrashedAssets(client, userInfo)
+        return immichService.findTrashedAssets(client, userInfo.apiKey)
     }
 
     @POST

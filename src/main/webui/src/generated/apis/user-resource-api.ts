@@ -22,11 +22,13 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
+import type { AssetRefreshJobStatus } from '../models';
+// @ts-ignore
 import type { ConvertResultResponse } from '../models';
 // @ts-ignore
-import type { JobStatus } from '../models';
-// @ts-ignore
 import type { QueuedAssetsResponse } from '../models';
+// @ts-ignore
+import type { SearchAssetsResponse } from '../models';
 // @ts-ignore
 import type { UserAddParams } from '../models';
 // @ts-ignore
@@ -229,6 +231,40 @@ export const UserResourceApiAxiosParamCreator = function (configuration?: Config
         },
         /**
          * 
+         * @summary Trashed Assets
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdAssetsTrashedGet: async (id: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiUsersIdAssetsTrashedGet', 'id', id)
+            const localVarPath = `/api/users/{id}/assets/trashed`
+                .replace('{id}', encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary User Details
          * @param {string} id 
          * @param {*} [options] Override http request option.
@@ -284,6 +320,7 @@ export const UserResourceApiAxiosParamCreator = function (configuration?: Config
             const localVarQueryParameter = {} as any;
 
             localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = 'application/json';
 
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
@@ -353,7 +390,7 @@ export const UserResourceApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiUsersIdAssetsRefreshPost(id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<JobStatus>> {
+        async apiUsersIdAssetsRefreshPost(id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AssetRefreshJobStatus>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiUsersIdAssetsRefreshPost(id, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['UserResourceApi.apiUsersIdAssetsRefreshPost']?.[localVarOperationServerIndex]?.url;
@@ -366,10 +403,23 @@ export const UserResourceApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiUsersIdAssetsStatusGet(id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<JobStatus>> {
+        async apiUsersIdAssetsStatusGet(id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AssetRefreshJobStatus>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiUsersIdAssetsStatusGet(id, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['UserResourceApi.apiUsersIdAssetsStatusGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Trashed Assets
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiUsersIdAssetsTrashedGet(id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<SearchAssetsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiUsersIdAssetsTrashedGet(id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['UserResourceApi.apiUsersIdAssetsTrashedGet']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -392,7 +442,7 @@ export const UserResourceApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiUsersPost(userAddParams: UserAddParams, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async apiUsersPost(userAddParams: UserAddParams, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<number>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiUsersPost(userAddParams, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['UserResourceApi.apiUsersPost']?.[localVarOperationServerIndex]?.url;
@@ -443,7 +493,7 @@ export const UserResourceApiFactory = function (configuration?: Configuration, b
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiUsersIdAssetsRefreshPost(requestParameters: UserResourceApiApiUsersIdAssetsRefreshPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<JobStatus> {
+        apiUsersIdAssetsRefreshPost(requestParameters: UserResourceApiApiUsersIdAssetsRefreshPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<AssetRefreshJobStatus> {
             return localVarFp.apiUsersIdAssetsRefreshPost(requestParameters.id, options).then((request) => request(axios, basePath));
         },
         /**
@@ -453,8 +503,18 @@ export const UserResourceApiFactory = function (configuration?: Configuration, b
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiUsersIdAssetsStatusGet(requestParameters: UserResourceApiApiUsersIdAssetsStatusGetRequest, options?: RawAxiosRequestConfig): AxiosPromise<JobStatus> {
+        apiUsersIdAssetsStatusGet(requestParameters: UserResourceApiApiUsersIdAssetsStatusGetRequest, options?: RawAxiosRequestConfig): AxiosPromise<AssetRefreshJobStatus> {
             return localVarFp.apiUsersIdAssetsStatusGet(requestParameters.id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Trashed Assets
+         * @param {UserResourceApiApiUsersIdAssetsTrashedGetRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiUsersIdAssetsTrashedGet(requestParameters: UserResourceApiApiUsersIdAssetsTrashedGetRequest, options?: RawAxiosRequestConfig): AxiosPromise<SearchAssetsResponse> {
+            return localVarFp.apiUsersIdAssetsTrashedGet(requestParameters.id, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -473,7 +533,7 @@ export const UserResourceApiFactory = function (configuration?: Configuration, b
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiUsersPost(requestParameters: UserResourceApiApiUsersPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        apiUsersPost(requestParameters: UserResourceApiApiUsersPostRequest, options?: RawAxiosRequestConfig): AxiosPromise<number> {
             return localVarFp.apiUsersPost(requestParameters.userAddParams, options).then((request) => request(axios, basePath));
         },
     };
@@ -512,6 +572,13 @@ export interface UserResourceApiApiUsersIdAssetsRefreshPostRequest {
  * Request parameters for apiUsersIdAssetsStatusGet operation in UserResourceApi.
  */
 export interface UserResourceApiApiUsersIdAssetsStatusGetRequest {
+    readonly id: string
+}
+
+/**
+ * Request parameters for apiUsersIdAssetsTrashedGet operation in UserResourceApi.
+ */
+export interface UserResourceApiApiUsersIdAssetsTrashedGetRequest {
     readonly id: string
 }
 
@@ -585,6 +652,17 @@ export class UserResourceApi extends BaseAPI {
      */
     public apiUsersIdAssetsStatusGet(requestParameters: UserResourceApiApiUsersIdAssetsStatusGetRequest, options?: RawAxiosRequestConfig) {
         return UserResourceApiFp(this.configuration).apiUsersIdAssetsStatusGet(requestParameters.id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Trashed Assets
+     * @param {UserResourceApiApiUsersIdAssetsTrashedGetRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiUsersIdAssetsTrashedGet(requestParameters: UserResourceApiApiUsersIdAssetsTrashedGetRequest, options?: RawAxiosRequestConfig) {
+        return UserResourceApiFp(this.configuration).apiUsersIdAssetsTrashedGet(requestParameters.id, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

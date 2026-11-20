@@ -16,8 +16,8 @@
 
 export interface ConvertResultResponse {
     'status': string;
-    'newAssetId': string | null;
-    'immichServerUrl': string | null;
-    'error': string | null;
+    'newAssetId'?: string | null;
+    'immichServerUrl'?: string | null;
+    'error'?: string | null;
 }
 
