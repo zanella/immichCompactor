@@ -70,7 +70,14 @@ data class QueueStatisticsDto(
     val failed: Int,
     val paused: Int,
     val waiting: Int,
-)
+) {
+    /**
+     * True while the queue still has work in progress or scheduled.
+     * [completed] and [failed] are terminal states, so they don't count.
+     */
+    val hasPendingWork: Boolean
+        get() = active > 0 || waiting > 0 || delayed > 0 || paused > 0
+}
 
 @Serializable
 data class QueueResponseDto(

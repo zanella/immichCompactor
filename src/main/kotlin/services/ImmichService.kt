@@ -44,6 +44,8 @@ class ImmichService(
     ): ImmichClient = Companion.instantiateClient(baseUrl, isDebug)
 
     companion object {
+        private const val QUEUE_POLL_INTERVAL_MILLIS = 500L
+
         fun instantiateClient(
             baseUrl: String,
             isDebug: Boolean = true,
@@ -104,6 +106,38 @@ class ImmichService(
         return client.searchByMetadata(userInfo.apiKey, searchCriteria)
     }
 
+    /**
+     * Immich's "actions" are async, so: block until every job queue is empty
+     * (no active, waiting, delayed or paused jobs left in any queue).
+     *
+     * Uses the new queues endpoint: https://api.immich.app/endpoints/jobs/getQueues
+     */
+    fun waitUntilAllQueuesAreEmpty(
+        client: ImmichClient,
+        apiKey: String,
+        pollIntervalMillis: Long = QUEUE_POLL_INTERVAL_MILLIS,
+    ) {
+        while (true) {
+            val busyQueues =
+                client
+                    .getQueues(apiKey)
+                    .filter { it.statistics.hasPendingWork }
+
+            if (busyQueues.isEmpty()) {
+                return
+            }
+
+            val summary =
+                busyQueues.joinToString { queue ->
+                    val stats = queue.statistics
+                    "${queue.name}(active=${stats.active}, waiting=${stats.waiting}, delayed=${stats.delayed}, paused=${stats.paused})"
+                }
+            Log.debug("Waiting for Immich job queues to empty: $summary")
+
+            Thread.sleep(pollIntervalMillis)
+        }
+    }
+
     fun findTrashedAssets(
         client: ImmichClient,
         apiKey: String,
@@ -138,13 +172,10 @@ class ImmichService(
         client: ImmichClient,
         userInfo: UserInfo,
     ): FindAndEnqueueAllAssetsResponse {
-        /*
-         * TODO: https://api.immich.app/endpoints/jobs/getQueuesLegacy
-         *
-         * It is possible, use the new queues endpoint
-         *
-         * The endpoint above is deprecated, so... can't be sure there are no jobs running :-/
-         */
+        // Immich processes uploads asynchronously, so wait until every job queue has
+        // drained before scanning — otherwise search results and tag checks may race
+        // with jobs that are still running.
+        waitUntilAllQueuesAreEmpty(client, userInfo.apiKey)
 
         // This runs on a bare virtual thread (no CDI request context), so DB access needs
         // explicit transactions — Panache's built-in reads only *join* a transaction,
