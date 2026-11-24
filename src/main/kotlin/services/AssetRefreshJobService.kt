@@ -1,10 +1,12 @@
 package services
 
+import database.AssetStagingAreaRepository
 import database.UserId
 import database.UserInfo
 import integration.immich.ImmichClient
 import internal.lang.getOrElseException
 import internal.lang.runCatchingSafely
+import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.inject.Singleton
 import kotlinx.serialization.Serializable
 import java.util.concurrent.ConcurrentHashMap
@@ -19,6 +21,7 @@ import kotlin.time.Instant
 @Singleton
 class AssetRefreshJobService(
     private val immichService: ImmichService,
+    private val assetStagingAreaRepository: AssetStagingAreaRepository,
 ) {
     enum class State { RUNNING, DONE, FAILED }
 
@@ -68,6 +71,9 @@ class AssetRefreshJobService(
             .getValue(userInfo.id)
             .let { prevJobStatus ->
                 runCatchingSafely {
+                    // A refresh rebuilds the staging area from scratch.
+                    QuarkusTransaction.requiringNew().run { assetStagingAreaRepository.deleteAll() }
+
                     val client = ImmichClient.instantiateClient(userInfo.immichServerUrl)
 
                     immichService.findAndEnqueueAllAssets(client, userInfo).let {
