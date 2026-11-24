@@ -149,6 +149,7 @@
                       class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 transition-colors whitespace-nowrap"
                     >View</a>
                     <button
+                      v-if="canConvert(asset.contentType)"
                       :disabled="convertingIds.has(asset.assetId)"
                       class="inline-flex items-center justify-center gap-1 min-w-16 px-2 py-1 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-wait transition-colors"
                       @click="convertAsset(asset.assetId)"
@@ -219,6 +220,11 @@ const showStatus = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const refreshing = computed(() => triggerInFlight.value || refreshStatus.value?.state === 'RUNNING');
+
+// UNHANDLED and UNKNOWN assets cannot be converted, so they get no convert button.
+function canConvert(contentType: string) {
+  return contentType === 'IMAGE' || contentType === 'VIDEO';
+}
 
 function fetchStatus() {
   userResourceApi

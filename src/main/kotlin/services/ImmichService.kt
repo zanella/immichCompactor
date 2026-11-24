@@ -370,7 +370,6 @@ fun getHandledContentTypeFromFileType(fileType: String): HandledContentType =
 
 enum class ContentType { UNHANDLED, UNKNOWN, IMAGE, VIDEO }
 
-// TODO: rename
 enum class HandledContentType(
     val contentType: ContentType,
 ) {
