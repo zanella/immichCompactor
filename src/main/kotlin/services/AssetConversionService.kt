@@ -175,7 +175,13 @@ class AssetConversionService(
 
             val assetInfo = requireNotNull(assetInfoResult)
 
+            var replacementLivePhotoVideoId: UUID? = null
+
             if (assetInfo.livePhotoVideoId != null) {
+                require(assetInfo.livePhotoVideoId == stagedAsset.livePhotoVideoId) {
+                    "The ID of the livePhotoVideo changed since the last refresh, it shouldn't..."
+                }
+
                 QuarkusTransaction
                     .requiringNew()
                     .run {
@@ -192,7 +198,7 @@ class AssetConversionService(
                     )
 
                 when (res) {
-                    is CustomEither.Left -> { /* pass */ }
+                    is CustomEither.Left -> replacementLivePhotoVideoId = res.value.second
                     is CustomEither.Right -> return res
                 }
             }
@@ -246,6 +252,22 @@ class AssetConversionService(
                     }
 
                     modifyAsset(stagedAsset, REPLACEMENT_HAS_BEEN_UPLOADED, it.id)
+
+                    // Re-attach the replacement video as this replacement image's live photo
+                    if (replacementLivePhotoVideoId != null) {
+                        val response =
+                            client.updateAsset(
+                                userInfo.apiKey,
+                                it.id,
+                                UpdateAssetDto(livePhotoVideoId = replacementLivePhotoVideoId),
+                            )
+
+                        if (response.livePhotoVideoId != replacementLivePhotoVideoId) {
+                            return CustomEither.Right(
+                                "Immich didn't set the livePhotoVideoId of replacement image ${it.id} to $replacementLivePhotoVideoId",
+                            )
+                        }
+                    }
                 }
 
             return null
@@ -291,11 +313,11 @@ class AssetConversionService(
                         ),
                     )
 
-                if (response.livePhotoVideoId != stagedAsset.assetId) {
+                if (response.livePhotoVideoId != stagedAsset.replacementId) {
                     return CustomEither
                         .Right(
                             """Immich didn't update the asset ${stagedAsset.replaceLivePhotoVideoIdOf} 
-                            livePhotoVideoId to ${stagedAsset.assetId}
+                            livePhotoVideoId to ${stagedAsset.replacementId}
                             """.trimMargin(),
                         )
                 }

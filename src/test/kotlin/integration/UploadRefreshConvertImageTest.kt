@@ -125,7 +125,7 @@ class UploadRefreshConvertImageTest : ImmichTestEnvironment() {
 
         assetConversionService.processQueuedAsset(getUserInfo().id, originalId)
 
-        waitUntilAllQueuesAreEmpty()
+        immichService.waitUntilAllQueuesAreEmpty(client, apiKey)
 
         val trashedAssets = immichService.findTrashedAssets(client, apiKey)
 

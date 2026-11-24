@@ -35,6 +35,14 @@ data class StagedAsset(
     @Column("replacement_id")
     @JdbcTypeCode(SqlTypes.VARCHAR)
     var replacementId: AssetId? = null,
+    /*
+     The IMAGE asset will have this populated.
+     Allows the listing page to filter out the videos which are linked as livePhoto*Videos*
+     */
+    @Column("live_photo_video_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    var livePhotoVideoId: AssetId? = null,
+    // The livePhotoVideo ITSELF will have this populated when its replacement has been uploaded
     @Column("replace_live_photo_video_id_of")
     @JdbcTypeCode(SqlTypes.VARCHAR)
     var replaceLivePhotoVideoIdOf: AssetId? = null,
@@ -58,6 +66,21 @@ class AssetStagingAreaRepository : PanacheRepositoryBase<StagedAsset, UUID> {
     @Transactional
     fun getAll(): List<StagedAsset> = listAll()
 
+    /**
+     * Base filter shared by [findQueuedByUserId] and [countQueuedByUserId]: the user's
+     * QUEUED assets of the given content types. A live photo's video part gets staged
+     * as its own row, but it is only ever processed together with its parent image —
+     * never standalone — so it is excluded here.
+     */
+    private val queuedAssetsQuery: String =
+        buildString {
+            append("userId = ?1 and currentState = ?2")
+            append(" and contentType in ?3")
+            append(" and assetId not in (")
+            append("select s.livePhotoVideoId from StagedAsset s where s.livePhotoVideoId is not null")
+            append(")")
+        }
+
     @Transactional
     fun findQueuedByUserId(
         userId: UserId,
@@ -65,15 +88,9 @@ class AssetStagingAreaRepository : PanacheRepositoryBase<StagedAsset, UUID> {
         pageSize: Int,
         contentTypes: List<ContentType>,
     ): List<StagedAsset> {
-        val query =
-            buildString {
-                append("userId = ?1 and currentState = ?2")
-                append(" and contentType in ?3")
-            }
-
         val effectiveContentTypes = contentTypes.ifEmpty { ContentType.entries.toList() }
 
-        return find(query, userId, AssetConversionState.QUEUED, effectiveContentTypes)
+        return find(queuedAssetsQuery, userId, AssetConversionState.QUEUED, effectiveContentTypes)
             .page(pageIndex, pageSize)
             .list()
     }
@@ -83,14 +100,8 @@ class AssetStagingAreaRepository : PanacheRepositoryBase<StagedAsset, UUID> {
         userId: UserId,
         contentTypes: List<ContentType>,
     ): Long {
-        val query =
-            buildString {
-                append("userId = ?1 and currentState = ?2")
-                append(" and contentType in ?3")
-            }
-
         val effectiveContentTypes = contentTypes.ifEmpty { ContentType.entries.toList() }
 
-        return count(query, userId, AssetConversionState.QUEUED, effectiveContentTypes)
+        return count(queuedAssetsQuery, userId, AssetConversionState.QUEUED, effectiveContentTypes)
     }
 }

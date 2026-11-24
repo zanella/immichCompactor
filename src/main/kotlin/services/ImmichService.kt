@@ -107,10 +107,7 @@ class ImmichService(
     }
 
     /**
-     * Immich's "actions" are async, so: block until every job queue is empty
-     * (no active, waiting, delayed or paused jobs left in any queue).
-     *
-     * Uses the new queues endpoint: https://api.immich.app/endpoints/jobs/getQueues
+     * Immich's "actions" are async, so: block until every job queue is empty.
      */
     fun waitUntilAllQueuesAreEmpty(
         client: ImmichClient,
@@ -225,6 +222,7 @@ class ImmichService(
                                     .let(::getHandledContentTypeFromFileType)
                                     .contentType,
                             currentState = AssetConversionState.QUEUED,
+                            livePhotoVideoId = asset.livePhotoVideoId,
                         )
                     }
 

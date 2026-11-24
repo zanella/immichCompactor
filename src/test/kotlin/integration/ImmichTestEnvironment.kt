@@ -63,10 +63,10 @@ abstract class ImmichTestEnvironment(
         // Mark all lingering assets for deletion
         client.deleteAssets(apiKey, DeleteAssetsRequest(ids = findAllAssets(), force = true))
 
-        waitUntilAllQueuesAreEmpty()
+        immichService.waitUntilAllQueuesAreEmpty(client, apiKey)
 
         // Permanently delete the asset
-        client.emptyTrash(apiKey).also { waitUntilAllQueuesAreEmpty() }
+        client.emptyTrash(apiKey).also { immichService.waitUntilAllQueuesAreEmpty(client, apiKey) }
 
         for (i in 0..2) { // Optimistic workaround
             if (immichService
@@ -114,15 +114,6 @@ abstract class ImmichTestEnvironment(
     }
 
     // ////////////////////////////////////////////////////////////////////////
-
-    /**
-     * Immich's "actions" are async, so: wait until all queues are empty
-     */
-    fun waitUntilAllQueuesAreEmpty() {
-        while (client.getQueues(apiKey).any { it.statistics.active >= 1 }) {
-            Thread.sleep(100)
-        }
-    }
 
     fun getTestAsset(path: String) =
         File(path)
