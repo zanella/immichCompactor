@@ -274,6 +274,8 @@ components:
           type: string
         apiKey:
           type: string
+        enabledSyncRemoteDeletions:
+          type: boolean
       required:
       - name
       - immichServerUrl
@@ -312,6 +314,8 @@ components:
           type: string
         _tagUUID:
           type: string
+        enabledSyncRemoteDeletions:
+          type: boolean
         _id:
           type:
           - integer

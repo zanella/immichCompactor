@@ -3,11 +3,12 @@
 --
 
 CREATE TABLE user_info (
-    id                  integer primary key autoincrement,
-    api_key             varchar(255) not null,
-    name                varchar(255) not null,
-    immich_server_url   varchar(255) not null,
-    tag_uuid            varchar(255) not null
+    id                          integer primary key autoincrement,
+    api_key                     varchar(255) not null,
+    name                        varchar(255) not null,
+    immich_server_url           varchar(255) not null,
+    tag_uuid                    varchar(255) not null,
+    enabled_sync_remote_deletions boolean not null default false
 );
 
 --

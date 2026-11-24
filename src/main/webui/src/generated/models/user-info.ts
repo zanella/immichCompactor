@@ -25,5 +25,6 @@ export interface UserInfo {
     '_id'?: number | null;
     'id'?: UserId;
     'tagId'?: string;
+    'enabledSyncRemoteDeletions'?: boolean;
 }
 

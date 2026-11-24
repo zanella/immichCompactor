@@ -46,6 +46,14 @@
           <input id="apiKey" v-model="form.apiKey" type="text"
                  class="w-full px-3 py-2 border border-gray-300 rounded-md font-mono focus:ring-2 focus:ring-indigo-500">
         </div>
+        <div class="flex items-center gap-2">
+          <input id="enabledSyncRemoteDeletions" v-model="form.enabledSyncRemoteDeletions" type="checkbox"
+                 class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+          <label for="enabledSyncRemoteDeletions" class="text-sm text-gray-700 cursor-pointer select-none">
+            <span class="font-bold">Enable</span> "Advanced -> Sync Remote Deletions" in the Immich <span class="font-bold">App</span> (The one on your phone, <span class="font-bold">if</span> you don't use th app, nothing to do, just check it)
+            <span class="block mt-1 text-red-600 font-semibold">Warning: if you don't do this, any asset you convert will be re-uploaded by the app, you DON'T want that.</span>
+          </label>
+        </div>
         <button type="submit" :disabled="submitting"
                 class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50">
           {{ submitting ? 'Saving...' : 'Save changes' }}
@@ -66,7 +74,7 @@ defineOptions({ name: 'UserDetails' });
 const route = useRoute();
 const loading = ref(true);
 const details = ref<UserDetails | null>(null);
-const form = reactive({ name: '', immichServerUrl: '', apiKey: '' });
+const form = reactive({ name: '', immichServerUrl: '', apiKey: '', enabledSyncRemoteDeletions: false });
 const saved = ref(false);
 const submitting = ref(false);
 
@@ -81,6 +89,7 @@ onMounted(() => {
       form.name = res.data.userInfo.name;
       form.immichServerUrl = res.data.userInfo.immichServerUrl;
       form.apiKey = res.data.userInfo.apiKey;
+      form.enabledSyncRemoteDeletions = res.data.userInfo.enabledSyncRemoteDeletions ?? false;
     })
     .finally(() => {
       loading.value = false;

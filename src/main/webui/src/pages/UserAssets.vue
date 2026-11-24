@@ -15,6 +15,12 @@
       </button>
     </div>
 
+    <div v-if="!syncRemoteDeletionsEnabled"
+         class="mt-4 mb-6 px-4 py-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-md text-sm">
+      Converting is disabled until you enable "Advanced -&gt; Sync Remote Deletions" for this user on the
+      <router-link :to="`/users/${userId}`" class="font-semibold underline">user page</router-link>.
+    </div>
+
     <div v-if="showStatus && refreshStatus?.state === 'RUNNING'"
          class="mt-4 mb-6 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-sm">
       Scanning Immich and queuing assets...
@@ -61,7 +67,7 @@
           </div>
         </div>
         <button
-          :disabled="batchConverting || queuedData.assets.length === 0"
+          :disabled="batchConverting || queuedData.assets.length === 0 || !syncRemoteDeletionsEnabled"
           class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-md hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           @click="batchConvert"
         >
@@ -150,7 +156,7 @@
                     >View</a>
                     <button
                       v-if="canConvert(asset.contentType)"
-                      :disabled="convertingIds.has(asset.assetId)"
+                      :disabled="convertingIds.has(asset.assetId) || !syncRemoteDeletionsEnabled"
                       class="inline-flex items-center justify-center gap-1 min-w-16 px-2 py-1 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-wait transition-colors"
                       @click="convertAsset(asset.assetId)"
                     >
@@ -225,6 +231,9 @@ const refreshing = computed(() => triggerInFlight.value || refreshStatus.value?.
 function canConvert(contentType: string) {
   return contentType === 'IMAGE' || contentType === 'VIDEO';
 }
+
+// Converting is only allowed once the user has enabled sync remote deletions.
+const syncRemoteDeletionsEnabled = computed(() => user.value?.enabledSyncRemoteDeletions === true);
 
 function fetchStatus() {
   userResourceApi
@@ -307,7 +316,7 @@ function convertAsset(assetId: string) {
 }
 
 async function batchConvert() {
-  if (!queuedData.value) return;
+  if (!queuedData.value || !syncRemoteDeletionsEnabled.value) return;
   batchConverting.value = true;
   const assets = [...queuedData.value.assets];
   const total = assets.length;

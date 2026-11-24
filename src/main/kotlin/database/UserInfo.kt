@@ -33,6 +33,8 @@ data class UserInfo(
     var immichServerUrl: String,
     @Column("tag_uuid")
     private val _tagUUID: String,
+    @Column("enabled_sync_remote_deletions")
+    var enabledSyncRemoteDeletions: Boolean = false,
 ) : PanacheEntityBase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
