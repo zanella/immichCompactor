@@ -4,11 +4,13 @@ EXPOSE 8080
 
 RUN dnf upgrade -y
 
-RUN dnf install libjxl -y
+# libjxl-utils provides the cjxl/djxl binaries (libjxl alone is just the library)
+RUN dnf install libjxl-utils -y
 
 RUN dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-44.noarch.rpm -y
 #https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
-RUN dnf install HandBrake -y
+# HandBrake-cli provides the HandBrakeCLI binary (the HandBrake package is the GUI only)
+RUN dnf install HandBrake-cli -y
 
 RUN dnf install java-25-openjdk -y
 
