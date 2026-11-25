@@ -2,9 +2,9 @@ import {
   Configuration, UserResourceApi,
 } from '@/generated';
 
-// TODO: get the path from the current active in the browser
+// Same origin as the page itself, so requests work from localhost, 0.0.0.0 or any host the jar is served on
 const apiClientsCfg = new Configuration({
-  basePath: "http://localhost:8080",
+  basePath: window.location.origin,
   baseOptions: {
     headers: {
       "Accept": "application/json",

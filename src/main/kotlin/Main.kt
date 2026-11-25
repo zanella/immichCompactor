@@ -1,20 +1,8 @@
 
 
 class Main {
-    /*
-     * TODO Not easy to fix:
-     *  - The user needs to delete all assets from device, otherwise the Immich app will upload them again
-     *  -- Or: turn ON Advanced :: Sync Remote deletions
-     *
-     * TODO DB:
-     *  - docker volume
-     *  - ORRRR: sqlite ?
-     *
-     * TODO:
+    /* TODO:
      *  - Ensure only one conversion request is handled at a time: mutex
-     *  - The asset list has to be ordered, not custom -> IMAGE, VIDEO, UNKNOWN
-     *  - handle assets with UNKNOWN type
-     *  - livePhotoVideoId is handled correctly now -> write a test asserting it <-----
      *  - Fix the tag feature checking
      */
     fun run(vararg args: String?): Int = 0

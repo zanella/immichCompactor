@@ -13,7 +13,12 @@ RUN dnf install HandBrake -y
 RUN dnf install java-25-openjdk -y
 
 # TODO: jar
+COPY build/quarkus-app/ /deployments/
 
-# TODO: volume for the sqlite file
+# The SQLite database lives here so it can be kept outside the container
+RUN mkdir -p /data
+VOLUME /data
 
-# TODO: CMD
+ENV JAVA_TOOL_OPTIONS=""
+
+CMD ["java", "-jar", "/deployments/quarkus-run.jar"]
