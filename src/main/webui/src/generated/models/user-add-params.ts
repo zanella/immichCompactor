@@ -20,5 +20,6 @@ export interface UserAddParams {
     'immichServerUrl': string;
     'apiKey': string;
     'enabledSyncRemoteDeletions'?: boolean;
+    'adminEnabledTags'?: boolean;
 }
 

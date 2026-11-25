@@ -1,5 +1,5 @@
 #!/bin/bash
 
-./gradlew quarkusBuild -x test;
+./gradlew clean quarkusBuild -x test;
 
 docker build -t immich-compactor .;

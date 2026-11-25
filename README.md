@@ -27,9 +27,9 @@ You'll need to do 3 steps:
 
 # How to run it
 
-TODO: docker instructions
+TODO: upload docker image
 
-1) http://localhost:8080
+Refer to "How to build and run"
 
 # Setup development environment
 
@@ -37,7 +37,7 @@ Set up the linter git hook, run this ONCE:
 
 `./gradlew addKtlintFormatGitPreCommitHook`
 
-# How to build
+# How to build and run
 
 - Run build.sh
 - `docker run --rm -p 8080:8080 -v immich-compactor-data:/data immich-compactor`

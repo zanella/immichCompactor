@@ -8,7 +8,8 @@ CREATE TABLE user_info (
     name                        varchar(255) not null,
     immich_server_url           varchar(255) not null,
     tag_uuid                    varchar(255) not null,
-    enabled_sync_remote_deletions boolean not null default false
+    enabled_sync_remote_deletions boolean not null default false,
+    admin_enabled_tags          boolean not null default false
 );
 
 --

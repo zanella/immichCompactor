@@ -276,6 +276,8 @@ components:
           type: string
         enabledSyncRemoteDeletions:
           type: boolean
+        adminEnabledTags:
+          type: boolean
       required:
       - name
       - immichServerUrl
@@ -315,6 +317,8 @@ components:
         _tagUUID:
           type: string
         enabledSyncRemoteDeletions:
+          type: boolean
+        adminEnabledTags:
           type: boolean
         _id:
           type:

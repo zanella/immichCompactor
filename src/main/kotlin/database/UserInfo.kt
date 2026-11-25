@@ -35,6 +35,8 @@ data class UserInfo(
     private val _tagUUID: String,
     @Column("enabled_sync_remote_deletions")
     var enabledSyncRemoteDeletions: Boolean = false,
+    @Column("admin_enabled_tags")
+    var adminEnabledTags: Boolean = false,
 ) : PanacheEntityBase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

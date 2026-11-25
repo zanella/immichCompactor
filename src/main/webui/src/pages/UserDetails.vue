@@ -54,6 +54,13 @@
             <span class="block mt-1 text-red-600 font-semibold">Warning: if you don't do this, any asset you convert will be re-uploaded by the app, you DON'T want that.</span>
           </label>
         </div>
+        <div class="flex items-center gap-2">
+          <input id="adminEnabledTags" v-model="form.adminEnabledTags" type="checkbox"
+                 class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+          <label for="adminEnabledTags" class="text-sm text-gray-700 cursor-pointer select-none">
+            Ask the admin to enable the tag feature
+          </label>
+        </div>
         <button type="submit" :disabled="submitting"
                 class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50">
           {{ submitting ? 'Saving...' : 'Save changes' }}
@@ -74,7 +81,7 @@ defineOptions({ name: 'UserDetails' });
 const route = useRoute();
 const loading = ref(true);
 const details = ref<UserDetails | null>(null);
-const form = reactive({ name: '', immichServerUrl: '', apiKey: '', enabledSyncRemoteDeletions: false });
+const form = reactive({ name: '', immichServerUrl: '', apiKey: '', enabledSyncRemoteDeletions: false, adminEnabledTags: false });
 const saved = ref(false);
 const submitting = ref(false);
 
@@ -90,6 +97,7 @@ onMounted(() => {
       form.immichServerUrl = res.data.userInfo.immichServerUrl;
       form.apiKey = res.data.userInfo.apiKey;
       form.enabledSyncRemoteDeletions = res.data.userInfo.enabledSyncRemoteDeletions ?? false;
+      form.adminEnabledTags = res.data.userInfo.adminEnabledTags ?? false;
     })
     .finally(() => {
       loading.value = false;

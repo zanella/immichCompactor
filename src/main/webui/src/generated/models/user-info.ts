@@ -26,5 +26,6 @@ export interface UserInfo {
     'id'?: UserId;
     'tagId'?: string;
     'enabledSyncRemoteDeletions'?: boolean;
+    'adminEnabledTags'?: boolean;
 }
 

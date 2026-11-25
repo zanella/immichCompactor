@@ -56,6 +56,7 @@ class UserInfoService(
                             immichServerUrl = immichServerUrl.trimEnd('/'),
                             _tagUUID = tagId.toString(),
                             enabledSyncRemoteDeletions = enabledSyncRemoteDeletions,
+                            adminEnabledTags = adminEnabledTags,
                         )
 
                     userInfoRepository.persist(user)
@@ -68,6 +69,7 @@ class UserInfoService(
                         it.immichServerUrl = immichServerUrl
                         it.apiKey = apiKey
                         it.enabledSyncRemoteDeletions = enabledSyncRemoteDeletions
+                        it.adminEnabledTags = adminEnabledTags
                     }
 
                     id
@@ -158,6 +160,7 @@ class UserInfoService(
             val immichServerUrl: String,
             val apiKey: String,
             val enabledSyncRemoteDeletions: Boolean = false,
+            val adminEnabledTags: Boolean = false,
         )
     }
 }

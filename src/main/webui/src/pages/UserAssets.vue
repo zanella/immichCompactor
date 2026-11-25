@@ -15,10 +15,10 @@
       </button>
     </div>
 
-    <div v-if="!syncRemoteDeletionsEnabled"
+    <div v-if="!conversionEnabled"
          class="mt-4 mb-6 px-4 py-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-md text-sm">
-      Converting is disabled until you enable "Advanced -&gt; Sync Remote Deletions" for this user on the
-      <router-link :to="`/users/${userId}`" class="font-semibold underline">user page</router-link>.
+      Converting is disabled until you check all boxes for this user on the
+      <router-link :to="`/users/${userId}`" class="font-semibold underline">user page</router-link>
     </div>
 
     <div v-if="showStatus && refreshStatus?.state === 'RUNNING'"
@@ -67,7 +67,7 @@
           </div>
         </div>
         <button
-          :disabled="batchConverting || queuedData.assets.length === 0 || !syncRemoteDeletionsEnabled"
+          :disabled="batchConverting || queuedData.assets.length === 0 || !conversionEnabled"
           class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-md hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           @click="batchConvert"
         >
@@ -156,7 +156,7 @@
                     >View</a>
                     <button
                       v-if="canConvert(asset.contentType)"
-                      :disabled="convertingIds.has(asset.assetId) || !syncRemoteDeletionsEnabled"
+                      :disabled="convertingIds.has(asset.assetId) || !conversionEnabled"
                       class="inline-flex items-center justify-center gap-1 min-w-16 px-2 py-1 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-wait transition-colors"
                       @click="convertAsset(asset.assetId)"
                     >
@@ -232,8 +232,10 @@ function canConvert(contentType: string) {
   return contentType === 'IMAGE' || contentType === 'VIDEO';
 }
 
-// Converting is only allowed once the user has enabled sync remote deletions.
+// Converting requires both acknowledgments on the user page.
 const syncRemoteDeletionsEnabled = computed(() => user.value?.enabledSyncRemoteDeletions === true);
+const adminEnabledTags = computed(() => user.value?.adminEnabledTags === true);
+const conversionEnabled = computed(() => syncRemoteDeletionsEnabled.value && adminEnabledTags.value);
 
 function fetchStatus() {
   userResourceApi
@@ -316,7 +318,7 @@ function convertAsset(assetId: string) {
 }
 
 async function batchConvert() {
-  if (!queuedData.value || !syncRemoteDeletionsEnabled.value) return;
+  if (!queuedData.value || !conversionEnabled.value) return;
   batchConverting.value = true;
   const assets = [...queuedData.value.assets];
   const total = assets.length;
